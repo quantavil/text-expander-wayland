@@ -85,21 +85,30 @@ pub fn has_key_conflict(text: &str, last_key: KeyCode) -> bool {
 pub fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
     let socket_path = get_ydotool_socket_path();
 
+    // Parse cursor placement marker $|$
+    let (actual_text, cursor_moves) = if let Some(pos) = text.find("$|$") {
+        let prefix = &text[..pos];
+        let suffix = &text[pos + 3..];
+        (format!("{}{}", prefix, suffix), suffix.chars().count())
+    } else {
+        (text.to_string(), 0)
+    };
+
     // Check if we should paste using the clipboard to avoid character-by-character typing bugs.
-    let use_paste = text.contains('\n')
-        || text.contains('\r')
-        || text.contains('\t')
-        || text.len() > 25
-        || has_key_conflict(text, last_key);
+    let use_paste = actual_text.contains('\n')
+        || actual_text.contains('\r')
+        || actual_text.contains('\t')
+        || actual_text.len() > 25
+        || has_key_conflict(&actual_text, last_key);
 
     if use_paste {
         // Only run wl-paste if we actually need to paste, saving process spawn overhead.
         let saved_clipboard = run_command("wl-paste", &["-n"]);
-        let is_clipboard_identical = text == saved_clipboard;
+        let is_clipboard_identical = actual_text == saved_clipboard;
 
         // 1. Copy the text to clipboard if it's not already there
         if !is_clipboard_identical {
-            copy_to_clipboard(text);
+            copy_to_clipboard(&actual_text);
         }
 
         // 2. Delete the trigger characters (backspaces)
@@ -138,6 +147,31 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
             run_wtype(&["-M", "ctrl", "-k", "v", "-m", "ctrl"]);
         }
 
+        // Move cursor back if $|$ was present
+        if cursor_moves > 0 {
+            thread::sleep(Duration::from_millis(30));
+            if let Some(ref socket) = socket_path {
+                let mut key_args = Vec::new();
+                for _ in 0..cursor_moves {
+                    key_args.push("105:1");
+                    key_args.push("105:0");
+                }
+                let refs: Vec<&str> = key_args.iter().map(|s| *s).collect();
+                let mut cmd = process::Command::new("ydotool");
+                cmd.env("YDOTOOL_SOCKET", socket);
+                cmd.arg("key").arg("-d").arg("0").args(&refs);
+                let _ = cmd.status();
+            } else {
+                let mut args = Vec::new();
+                for _ in 0..cursor_moves {
+                    args.push("-k".into());
+                    args.push("Left".into());
+                }
+                let refs: Vec<&str> = args.iter().map(|s| *s).collect();
+                run_wtype(&refs);
+            }
+        }
+
         // 4. Restore original clipboard content in a background thread if we modified it
         if !is_clipboard_identical {
             // Restore clipboard in a background thread after a delay to allow the application
@@ -165,8 +199,22 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
             }
             let mut cmd = process::Command::new("ydotool");
             cmd.env("YDOTOOL_SOCKET", socket);
-            cmd.arg("type").arg("-d").arg("1").arg("-H").arg("1").arg(text);
+            cmd.arg("type").arg("-d").arg("1").arg("-H").arg("1").arg(&actual_text);
             let _ = cmd.status();
+
+            // Move cursor back if $|$ was present
+            if cursor_moves > 0 {
+                let mut key_args = Vec::new();
+                for _ in 0..cursor_moves {
+                    key_args.push("105:1");
+                    key_args.push("105:0");
+                }
+                let refs: Vec<&str> = key_args.iter().map(|s| *s).collect();
+                let mut cmd = process::Command::new("ydotool");
+                cmd.env("YDOTOOL_SOCKET", socket);
+                cmd.arg("key").arg("-d").arg("0").args(&refs);
+                let _ = cmd.status();
+            }
         } else {
             let mut args: Vec<String> = Vec::new();
             for _ in 0..backspaces {
@@ -174,10 +222,21 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
                 args.push("BackSpace".into());
             }
             args.push("--".into());
-            args.push(text.into());
+            args.push(actual_text.clone());
 
             let refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
             run_wtype(&refs);
+
+            // Move cursor back if $|$ was present
+            if cursor_moves > 0 {
+                let mut args = Vec::new();
+                for _ in 0..cursor_moves {
+                    args.push("-k".into());
+                    args.push("Left".into());
+                }
+                let refs: Vec<&str> = args.iter().map(|s| *s).collect();
+                run_wtype(&refs);
+            }
         }
     }
 }

@@ -38,6 +38,8 @@ text_expander/
 ## Insights
 - Simple Espanso compatibility makes it easy to migrate configs directly.
 - The use of `libc::poll` makes it extremely lightweight compared to heavy daemons.
+- **Feature (Cursor Placement):** Added parsing for the `$|$` cursor placement marker in expansions, which positions the cursor at the marker post-injection using simulated Left arrow presses.
+- **Feature (Word Boundaries):** Implemented a smart word boundary heuristic. Triggers starting with an alphanumeric character are only matched if preceded by a non-alphanumeric character (e.g. space/punctuation), preventing accidental inside-word trigger activations.
 - **Bug Fix (Keyboard Detection):** The virtual keyboard detection logic was refactored to check specifically for remappers like `keyd`, `kmonad`, or `kanata`. Previously, the presence of any device containing "virtual" in its name (e.g. `ydotoold virtual device`) would disable reading from physical keyboards entirely.
 - **Bug Fix (Clipboard Paste Injection):** Added clipboard-based pasting via simulated Ctrl+V/Shift+Insert for expansions that are multiline, long (>25 chars), or equal to the clipboard. This fixes capital character dropping (e.g., Phase -> hase) caused by physical key conflicts and prevents editor auto-indent/auto-bracket malfunctions when typing code.
 

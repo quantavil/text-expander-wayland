@@ -150,6 +150,20 @@ impl TextExpander {
 
             for (trig, data) in &self.sorted_triggers {
                 if self.buffer.ends_with(trig) {
+                    // Word boundary check: if trigger starts with alphanumeric, preceding char must not be alphanumeric
+                    if let Some(first_char) = trig.chars().next() {
+                        if first_char.is_alphanumeric() {
+                            let start_idx = self.buffer.len() - trig.len();
+                            if start_idx > 0 {
+                                if let Some(char_before) = self.buffer.chars().nth(start_idx - 1) {
+                                    if char_before.is_alphanumeric() {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     let result = (trig.len(), data.expand());
                     self.buffer.clear();
                     return Some(result);
