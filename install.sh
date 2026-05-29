@@ -49,7 +49,25 @@ matches:
         params:
           format: "%Y-%m-%d"
 
-  # Shell command
+  # Time variable
+  - trigger: ";time"
+    replace: "{{time}}"
+    vars:
+      - name: time
+        type: date
+        params:
+          format: "%H:%M"
+
+  # Date and Time variable
+  - trigger: ";datetime"
+    replace: "{{dt}}"
+    vars:
+      - name: dt
+        type: date
+        params:
+          format: "%Y-%m-%d %H:%M:%S"
+
+  # Get external IP address
   - trigger: ";ip"
     replace: "{{ip}}"
     vars:
@@ -57,6 +75,22 @@ matches:
         type: shell
         params:
           cmd: "curl -s ifconfig.me"
+
+  # Print current system details
+  - trigger: ";sysinfo"
+    replace: "{{sysinfo}}"
+    vars:
+      - name: sysinfo
+        type: shell
+        params:
+          cmd: "uname -sr"
+
+  # Paste from clipboard
+  - trigger: ";clip"
+    replace: "{{clip}}"
+    vars:
+      - name: clip
+        type: clipboard
 EOF
 fi
 

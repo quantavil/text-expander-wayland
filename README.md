@@ -4,6 +4,18 @@ Lightweight text expander for Wayland. Built as a minimal replacement for [espan
 
 It is extremely resource-efficient, consuming only **~1.7 MB - 3.4 MB** of RAM at runtime (compared to Espanso's 50MB - 100MB+).
 
+### Comparison with Espanso
+
+| Feature | `text_expander` | `espanso` |
+|---------|-----------------|-----------|
+| **Memory Usage** | **~1.7 MB - 3.4 MB RAM** | ~50 MB - 120 MB RAM |
+| **Process Model** | Single minimal daemon | Multiple daemon & worker processes |
+| **Wayland Integration** | Native (via `ydotool` / `wtype`) | Native/XWayland (often requires complex setups) |
+| **Config Format** | Espanso-compatible YAML | YAML |
+| **Basic Triggers & Vars** | Supported (date, shell, clipboard) | Supported |
+| **Advanced Features** | No (Regex triggers, forms, scripts) | Supported |
+| **System Overhead** | Negligible | Moderate |
+
 Supports the most commonly used espanso match features (simple triggers, variables, shell commands). Advanced features like regex triggers, forms, and app-specific configs are not supported.
 
 ## Requirements
