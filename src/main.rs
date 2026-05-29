@@ -342,12 +342,12 @@ fn type_expansion(backspaces: usize, text: &str) {
             let refs: Vec<&str> = key_args.iter().map(|s| *s).collect();
             let mut cmd = process::Command::new("ydotool");
             cmd.env("YDOTOOL_SOCKET", &socket_path);
-            cmd.arg("key").args(&refs);
+            cmd.arg("key").arg("-d").arg("0").args(&refs);
             let _ = cmd.status();
         }
         let mut cmd = process::Command::new("ydotool");
         cmd.env("YDOTOOL_SOCKET", &socket_path);
-        cmd.arg("type").arg(text);
+        cmd.arg("type").arg("-d").arg("1").arg("-H").arg("1").arg(text);
         let _ = cmd.status();
     } else {
         let mut args: Vec<String> = Vec::new();
