@@ -35,7 +35,8 @@ text_expander/
 - Simple Espanso compatibility makes it easy to migrate configs directly.
 - The use of `libc::poll` makes it extremely lightweight compared to heavy daemons.
 - **Bug Fix (Keyboard Detection):** The virtual keyboard detection logic was refactored to check specifically for remappers like `keyd`, `kmonad`, or `kanata`. Previously, the presence of any device containing "virtual" in its name (e.g. `ydotoold virtual device`) would disable reading from physical keyboards entirely.
-- **Bug Fix (Wayland Display):** Refactored the environment loading to dynamically scan `XDG_RUNTIME_DIR` for active `wayland-*` sockets. Previously, it would fallback to `wayland-1` by default when running under a systemd system service, causing `wtype` to fail with `Wayland connection failed` if the user was on `wayland-0`.
+- **Bug Fix (Clipboard Paste Injection):** Added clipboard-based pasting via simulated Ctrl+V/Shift+Insert for expansions that are multiline, long (>25 chars), or equal to the clipboard. This fixes capital character dropping (e.g., Phase -> hase) caused by physical key conflicts and prevents editor auto-indent/auto-bracket malfunctions when typing code.
 
 ## Blunders
 *(None logged yet)*
+
