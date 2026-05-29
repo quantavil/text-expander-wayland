@@ -2,6 +2,8 @@
 
 Lightweight text expander for Wayland. Built as a minimal replacement for [espanso](https://espanso.org/) that reads espanso-format config files.
 
+It is extremely resource-efficient, consuming only **~1.7 MB - 3.4 MB** of RAM at runtime (compared to Espanso's 50MB - 100MB+).
+
 Supports the most commonly used espanso match features (simple triggers, variables, shell commands). Advanced features like regex triggers, forms, and app-specific configs are not supported.
 
 ## Requirements
