@@ -91,6 +91,16 @@ matches:
     vars:
       - name: clip
         type: clipboard
+
+  # List all triggers
+  - trigger: ";?"
+    replace: "Available commands:\n{{commands}}"
+    vars:
+      - name: commands
+        type: shell
+        params:
+          cmd: |-
+            grep -r -h -E 'triggers?:' ~/.config/text_expander/ | sed -E 's/.*triggers?:\s*//; s/,/\n/g' | tr -d '[]\" ' | sort -u
 EOF
 fi
 
