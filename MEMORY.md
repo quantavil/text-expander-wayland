@@ -12,10 +12,14 @@ text_expander/
 ├── install.sh            # Setup script for automated installation and daemon service configuration
 ├── uninstall.sh          # Cleanup script to stop/disable the service and uninstall the binary
 └── src/
-    └── main.rs           # Core implementation (CLI, config loading, input polling, key-to-char mapping, expansion logic)
+    ├── config.rs         # YAML configuration parsing, path resolution, and variable expansion
+    ├── input.rs          # Keyboard polling, keycode translation, and trigger tracking state machine
+    ├── inject.rs         # Simulated keystroke injection (wtype/ydotool) and clipboard pasting
+    ├── daemon.rs         # process fork helper for manual background running
+    └── main.rs           # Main entry point and raw event loop
 
 ## Conventions
-- Single-file codebase: The core expansion logic, EVDEV event loop, and Espanso YAML parser are currently all located in `src/main.rs`.
+- Modularized architecture: The codebase is split into config, input, inject, and daemon modules under `src/`.
 - Configuration path resolving: Automatically looks for `$HOME/.config/text_expander` (falling back to parsing `/etc/passwd` via `SUDO_USER` if run under `sudo`).
 - Event polling: Uses Linux system call `libc::poll` to poll all active `/dev/input/event*` devices synchronously.
 - Text injection: Relies on invoking the external command `wtype` to simulate key presses (including backspaces) and send UTF-8 characters.
