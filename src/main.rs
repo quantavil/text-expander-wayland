@@ -230,7 +230,7 @@ fn get_config_path() -> PathBuf {
     PathBuf::from(home).join(".config/text_expander")
 }
 
-fn find_keyboards() -> Vec<Device> {
+fn find_keyboards() -> Vec<(PathBuf, Device)> {
     let mut keyboards = Vec::new();
     let mut virtual_kbd = None;
 
@@ -254,9 +254,9 @@ fn find_keyboards() -> Vec<Device> {
         let is_remapper = name_lower.contains("keyd") || name_lower.contains("kmonad") || name_lower.contains("kanata");
 
         if is_remapper {
-            virtual_kbd = Some(device);
+            virtual_kbd = Some((path, device));
         } else if !name_lower.contains("virtual") {
-            keyboards.push(device);
+            keyboards.push((path, device));
         }
     }
 
@@ -382,16 +382,17 @@ fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
     let socket_path = get_ydotool_socket_path();
     
     // Check if we should paste using the clipboard to avoid character-by-character typing bugs.
-    let saved_clipboard = run_command("wl-paste", &["-n"]);
-    let is_clipboard_identical = text == saved_clipboard;
-    let use_paste = is_clipboard_identical 
-        || text.contains('\n') 
+    let use_paste = text.contains('\n') 
         || text.contains('\r') 
         || text.contains('\t') 
         || text.len() > 25
         || has_key_conflict(text, last_key);
 
     if use_paste {
+        // Only run wl-paste if we actually need to paste, saving process spawn overhead.
+        let saved_clipboard = run_command("wl-paste", &["-n"]);
+        let is_clipboard_identical = text == saved_clipboard;
+
         // 1. Copy the text to clipboard if it's not already there
         if !is_clipboard_identical {
             copy_to_clipboard(text);
@@ -433,12 +434,15 @@ fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
             run_wtype(&["-M", "ctrl", "-k", "v", "-m", "ctrl"]);
         }
 
-        // 4. Restore original clipboard content if we modified it
+        // 4. Restore original clipboard content in a background thread if we modified it
         if !is_clipboard_identical {
-            // Sleep to ensure the paste operation has requested/received the clipboard content
-            // before we restore the previous clipboard content.
-            thread::sleep(Duration::from_millis(150));
-            copy_to_clipboard(&saved_clipboard);
+            // Restore clipboard in a background thread after a delay to allow the application
+            // to complete the paste request, without blocking the main event loop.
+            let saved = saved_clipboard.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(800));
+                copy_to_clipboard(&saved);
+            });
         }
     } else {
         // Fallback: character-by-character simulated typing
@@ -475,7 +479,7 @@ fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {
 }
 
 struct TextExpander {
-    triggers: HashMap<String, Trigger>,
+    sorted_triggers: Vec<(String, Trigger)>,
     buffer: String,
     max_len: usize,
     shift: bool,
@@ -485,7 +489,12 @@ struct TextExpander {
 impl TextExpander {
     fn new(triggers: HashMap<String, Trigger>) -> Self {
         let max_len = triggers.keys().map(|k| k.len()).max().unwrap_or(64);
-        Self { triggers, buffer: String::with_capacity(max_len + 1), max_len, shift: false, capslock: false }
+        let mut sorted_triggers: Vec<(String, Trigger)> = triggers.into_iter().collect();
+        // Sort by length descending to make trigger matching deterministic (longest match wins)
+        sorted_triggers.sort_by(|a, b| {
+            b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0))
+        });
+        Self { sorted_triggers, buffer: String::with_capacity(max_len + 1), max_len, shift: false, capslock: false }
     }
 
     fn process(&mut self, key: KeyCode, pressed: bool) -> Option<(usize, String)> {
@@ -513,14 +522,31 @@ impl TextExpander {
             _ => {}
         }
 
-        let effective_shift = self.shift ^ self.capslock;
+        // Caps Lock only inverts the shift state for alphabetic keys.
+        let is_alphabetic = matches!(
+            key,
+            KeyCode::KEY_A | KeyCode::KEY_B | KeyCode::KEY_C | KeyCode::KEY_D |
+            KeyCode::KEY_E | KeyCode::KEY_F | KeyCode::KEY_G | KeyCode::KEY_H |
+            KeyCode::KEY_I | KeyCode::KEY_J | KeyCode::KEY_K | KeyCode::KEY_L |
+            KeyCode::KEY_M | KeyCode::KEY_N | KeyCode::KEY_O | KeyCode::KEY_P |
+            KeyCode::KEY_Q | KeyCode::KEY_R | KeyCode::KEY_S | KeyCode::KEY_T |
+            KeyCode::KEY_U | KeyCode::KEY_V | KeyCode::KEY_W | KeyCode::KEY_X |
+            KeyCode::KEY_Y | KeyCode::KEY_Z
+        );
+
+        let effective_shift = if is_alphabetic {
+            self.shift ^ self.capslock
+        } else {
+            self.shift
+        };
+
         if let Some(c) = key_to_char(key, effective_shift) {
             self.buffer.push(c);
             if self.buffer.len() > self.max_len {
                 self.buffer.drain(..self.buffer.len() - self.max_len);
             }
 
-            for (trig, data) in &self.triggers {
+            for (trig, data) in &self.sorted_triggers {
                 if self.buffer.ends_with(trig) {
                     let result = (trig.len(), data.expand());
                     self.buffer.clear();
@@ -586,12 +612,25 @@ fn main() {
     let mut expander = TextExpander::new(triggers);
 
     loop {
-        let raw_fds: Vec<i32> = keyboards.iter().map(|k| k.as_raw_fd()).collect();
+        let raw_fds: Vec<i32> = keyboards.iter().map(|(_, k)| k.as_raw_fd()).collect();
         let mut pollfds: Vec<libc::pollfd> = raw_fds.iter()
             .map(|&fd| libc::pollfd { fd, events: libc::POLLIN, revents: 0 })
             .collect();
 
-        if unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as _, -1) } < 0 {
+        let poll_res = unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as _, 5000) };
+        if poll_res < 0 {
+            continue;
+        }
+
+        if poll_res == 0 {
+            // Timeout reached: scan for new keyboards (hotplugging support)
+            let scanned = find_keyboards();
+            for (path, device) in scanned {
+                if !keyboards.iter().any(|(p, _)| *p == path) {
+                    eprintln!("New keyboard hotplugged: {:?}", path);
+                    keyboards.push((path, device));
+                }
+            }
             continue;
         }
 
@@ -599,7 +638,7 @@ fn main() {
         while i > 0 {
             i -= 1;
             if pollfds[i].revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0 {
-                eprintln!("Keyboard disconnected (fd {}), removing", raw_fds[i]);
+                eprintln!("Keyboard disconnected (path: {:?}), removing", keyboards[i].0);
                 keyboards.remove(i);
             }
         }
@@ -612,10 +651,9 @@ fn main() {
             .filter(|(_, p)| p.revents & libc::POLLIN != 0)
             .map(|(i, _)| i).collect();
 
-
         for &i in &ready {
             if i >= keyboards.len() { continue }
-            if let Ok(events) = keyboards[i].fetch_events() {
+            if let Ok(events) = keyboards[i].1.fetch_events() {
                 for ev in events {
                     if ev.event_type() == EventType::KEY {
                         if let Some((n, text)) = expander.process(KeyCode::new(ev.code()), ev.value() == 1) {
