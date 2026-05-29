@@ -137,7 +137,7 @@ fn load_yaml_recursive(dir: &PathBuf, triggers: &mut HashMap<String, Trigger>, g
             load_yaml_recursive(&path, triggers, global_vars);
         } else if path.extension().map_or(false, |e| e == "yaml" || e == "yml") {
             let Ok(content) = fs::read_to_string(&path) else { continue };
-            match serde_yaml::from_str::<EspansoConfig>(&content) {
+            match serde_saphyr::from_str::<EspansoConfig>(&content) {
                 Ok(config) => {
                     global_vars.extend(config.global_vars);
                     let mut count = 0;
