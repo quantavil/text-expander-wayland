@@ -82,14 +82,28 @@ impl Trigger {
     }
 }
 
-fn run_command(cmd: &str, args: &[&str]) -> String {
-    process::Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .unwrap_or_default()
+fn run_command(cmd_name: &str, args: &[&str]) -> String {
+    if let Ok(sudo_user) = env::var("SUDO_USER") {
+        let mut cmd = process::Command::new("sudo");
+        cmd.arg("-u").arg(&sudo_user).arg("env");
+        for (k, v) in get_wayland_env() {
+            cmd.arg(format!("{}={}", k, v));
+        }
+        cmd.arg(cmd_name).args(args);
+        cmd.output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default()
+    } else {
+        process::Command::new(cmd_name)
+            .args(args)
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default()
+    }
 }
 
 fn key_to_char(key: KeyCode, shift: bool) -> Option<char> {
