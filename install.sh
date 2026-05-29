@@ -1,0 +1,96 @@
+#!/bin/bash
+set -e
+
+# Configuration
+REAL_USER=${SUDO_USER:-$(whoami)}
+REAL_UID=${SUDO_UID:-$(id -u)}
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+
+BINARY_SRC="$(pwd)/target/release/text_expander"
+BINARY_DST="/usr/local/bin/text_expander"
+CONFIG_DIR="$REAL_HOME/.config/text_expander"
+SERVICE_PATH="/etc/systemd/system/text_expander.service"
+
+echo "=== Installing text_expander ==="
+
+# 1. Copy the binary
+if [ -f "$BINARY_SRC" ]; then
+    if systemctl is-active --quiet text_expander 2>/dev/null; then
+        echo "Stopping active text_expander service..."
+        systemctl stop text_expander || true
+    fi
+    echo "Copying binary to $BINARY_DST..."
+    cp "$BINARY_SRC" "$BINARY_DST"
+    chmod +x "$BINARY_DST"
+else
+    echo "Error: Release binary not found at $BINARY_SRC."
+    echo "Please build the project first with: cargo build --release"
+    exit 1
+fi
+
+# 2. Setup config directory and starter base.yml
+echo "Setting up configuration directory at $CONFIG_DIR..."
+mkdir -p "$CONFIG_DIR"
+
+if [ ! -f "$CONFIG_DIR/base.yml" ]; then
+    echo "Creating starter configuration in $CONFIG_DIR/base.yml..."
+    cat << 'EOF' > "$CONFIG_DIR/base.yml"
+matches:
+  # Simple replacement
+  - trigger: ";sig"
+    replace: "Best regards,\nquantavil"
+
+  # Date variable
+  - trigger: ";date"
+    replace: "{{date}}"
+    vars:
+      - name: date
+        type: date
+        params:
+          format: "%Y-%m-%d"
+
+  # Shell command
+  - trigger: ";ip"
+    replace: "{{ip}}"
+    vars:
+      - name: ip
+        type: shell
+        params:
+          cmd: "curl -s ifconfig.me"
+EOF
+fi
+
+# Ensure correct ownership of the config directory and files so the user can edit them
+chown -R $REAL_USER:$REAL_USER "$CONFIG_DIR"
+
+# 3. Create systemd service
+echo "Creating systemd service at $SERVICE_PATH..."
+cat << EOF > "$SERVICE_PATH"
+[Unit]
+Description=Text Expander Daemon
+After=graphical.target
+
+[Service]
+ExecStart=$BINARY_DST
+Restart=always
+Environment=SUDO_USER=$REAL_USER
+Environment=SUDO_UID=$REAL_UID
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+# 4. Reload and start systemd service
+echo "Reloading systemd daemon..."
+systemctl daemon-reload
+
+echo "Enabling and starting text_expander service..."
+systemctl enable text_expander
+systemctl restart text_expander
+
+echo "Service status:"
+systemctl status text_expander --no-pager
+
+echo "=== Installation complete! ==="
+echo "You can edit your triggers in $CONFIG_DIR/base.yml"
+echo "After editing, run: systemctl restart text_expander"

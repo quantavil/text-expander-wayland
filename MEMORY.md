@@ -9,6 +9,8 @@ text_expander/
 ├── Cargo.lock            # Lockfile for Rust dependencies
 ├── LICENSE               # GPL-3.0 License
 ├── README.md             # Overview, setup, usage instructions, systemd service configuration
+├── install.sh            # Setup script for automated installation and daemon service configuration
+├── uninstall.sh          # Cleanup script to stop/disable the service and uninstall the binary
 └── src/
     └── main.rs           # Core implementation (CLI, config loading, input polling, key-to-char mapping, expansion logic)
 
@@ -32,6 +34,8 @@ text_expander/
 ## Insights
 - Simple Espanso compatibility makes it easy to migrate configs directly.
 - The use of `libc::poll` makes it extremely lightweight compared to heavy daemons.
+- **Bug Fix (Keyboard Detection):** The virtual keyboard detection logic was refactored to check specifically for remappers like `keyd`, `kmonad`, or `kanata`. Previously, the presence of any device containing "virtual" in its name (e.g. `ydotoold virtual device`) would disable reading from physical keyboards entirely.
+- **Bug Fix (Wayland Display):** Refactored the environment loading to dynamically scan `XDG_RUNTIME_DIR` for active `wayland-*` sockets. Previously, it would fallback to `wayland-1` by default when running under a systemd system service, causing `wtype` to fail with `Wayland connection failed` if the user was on `wayland-0`.
 
 ## Blunders
 *(None logged yet)*

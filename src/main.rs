@@ -236,15 +236,18 @@ fn find_keyboards() -> Vec<Device> {
         let name = device.name().unwrap_or("unknown");
         eprintln!("Found keyboard: {:?} - {}", path, name);
 
-        if name.to_lowercase().contains("virtual") {
+        let name_lower = name.to_lowercase();
+        let is_remapper = name_lower.contains("keyd") || name_lower.contains("kmonad") || name_lower.contains("kanata");
+
+        if is_remapper {
             virtual_kbd = Some(device);
-        } else if virtual_kbd.is_none() {
+        } else if !name_lower.contains("virtual") {
             keyboards.push(device);
         }
     }
 
     if let Some(vkbd) = virtual_kbd {
-        eprintln!("Using virtual keyboard only (keyd/kmonad detected)");
+        eprintln!("Using virtual keyboard only (keyd/kmonad/kanata detected)");
         vec![vkbd]
     } else {
         keyboards
@@ -255,19 +258,63 @@ fn get_wayland_env() -> Vec<(String, String)> {
     let mut env_vars = Vec::new();
     let real_uid = env::var("SUDO_UID").unwrap_or_default();
 
-    if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
-        env_vars.push(("XDG_RUNTIME_DIR".into(), xdg));
+    let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
+        xdg
     } else if !real_uid.is_empty() {
-        env_vars.push(("XDG_RUNTIME_DIR".into(), format!("/run/user/{}", real_uid)));
+        format!("/run/user/{}", real_uid)
+    } else {
+        String::new()
+    };
+
+    if !xdg_runtime.is_empty() {
+        env_vars.push(("XDG_RUNTIME_DIR".into(), xdg_runtime.clone()));
     }
 
-    env_vars.push(("WAYLAND_DISPLAY".into(),
-        env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-1".into())));
+    let mut wayland_display = env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-1".into());
+    if !xdg_runtime.is_empty() {
+        if let Ok(entries) = fs::read_dir(&xdg_runtime) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.starts_with("wayland-") && !name.ends_with(".lock") {
+                    wayland_display = name;
+                    break;
+                }
+            }
+        }
+    }
+
+    env_vars.push(("WAYLAND_DISPLAY".into(), wayland_display));
 
     if let Ok(user) = env::var("SUDO_USER") {
         env_vars.push(("USER".into(), user));
     }
     env_vars
+}
+
+fn get_ydotool_socket_path() -> Option<PathBuf> {
+    let real_uid = env::var("SUDO_UID").unwrap_or_default();
+    let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
+        xdg
+    } else if !real_uid.is_empty() {
+        format!("/run/user/{}", real_uid)
+    } else {
+        String::new()
+    };
+
+    if !xdg_runtime.is_empty() {
+        let path = PathBuf::from(&xdg_runtime).join(".ydotool_socket");
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    // Direct fallback check for uid 1000
+    let path = PathBuf::from("/run/user/1000/.ydotool_socket");
+    if path.exists() {
+        return Some(path);
+    }
+
+    None
 }
 
 fn run_wtype(args: &[&str]) {
@@ -285,16 +332,35 @@ fn run_wtype(args: &[&str]) {
 }
 
 fn type_expansion(backspaces: usize, text: &str) {
-    let mut args: Vec<String> = Vec::new();
-    for _ in 0..backspaces {
-        args.push("-k".into());
-        args.push("BackSpace".into());
-    }
-    args.push("--".into());
-    args.push(text.into());
+    if let Some(socket_path) = get_ydotool_socket_path() {
+        if backspaces > 0 {
+            let mut key_args = Vec::new();
+            for _ in 0..backspaces {
+                key_args.push("14:1");
+                key_args.push("14:0");
+            }
+            let refs: Vec<&str> = key_args.iter().map(|s| *s).collect();
+            let mut cmd = process::Command::new("ydotool");
+            cmd.env("YDOTOOL_SOCKET", &socket_path);
+            cmd.arg("key").args(&refs);
+            let _ = cmd.status();
+        }
+        let mut cmd = process::Command::new("ydotool");
+        cmd.env("YDOTOOL_SOCKET", &socket_path);
+        cmd.arg("type").arg(text);
+        let _ = cmd.status();
+    } else {
+        let mut args: Vec<String> = Vec::new();
+        for _ in 0..backspaces {
+            args.push("-k".into());
+            args.push("BackSpace".into());
+        }
+        args.push("--".into());
+        args.push(text.into());
 
-    let refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    run_wtype(&refs);
+        let refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        run_wtype(&refs);
+    }
 }
 
 struct TextExpander {
@@ -325,8 +391,14 @@ impl TextExpander {
         if !pressed { return None }
 
         match key {
-            KeyCode::KEY_ENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC => { self.buffer.clear(); return None }
-            KeyCode::KEY_BACKSPACE => { self.buffer.pop(); return None }
+            KeyCode::KEY_ENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC => {
+                self.buffer.clear();
+                return None;
+            }
+            KeyCode::KEY_BACKSPACE => {
+                self.buffer.pop();
+                return None;
+            }
             _ => {}
         }
 
