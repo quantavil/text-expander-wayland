@@ -3,43 +3,86 @@ use std::{
     collections::HashMap,
     fs,
     path::PathBuf,
+    sync::atomic::{AtomicU8, Ordering},
 };
 use crate::config::Trigger;
 
+pub static MODIFIERS_DOWN: AtomicU8 = AtomicU8::new(0);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hotkey {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub meta: bool,
+    pub key: KeyCode,
+}
+
+impl Hotkey {
+    pub fn parse(s: &str) -> Option<Self> {
+        let parts: Vec<String> = s.split('+').map(|p| p.trim().to_lowercase()).collect();
+        let mut ctrl = false;
+        let mut alt = false;
+        let mut shift = false;
+        let mut meta = false;
+        let mut key = None;
+
+        for part in &parts {
+            match part.as_str() {
+                "ctrl" => ctrl = true,
+                "alt" => alt = true,
+                "shift" => shift = true,
+                "super" | "meta" | "win" => meta = true,
+                other => {
+                    if other.len() == 1 {
+                        let c = other.chars().next().unwrap();
+                        key = char_to_keycode(c);
+                    } else if other == "space" {
+                        key = Some(KeyCode::KEY_SPACE);
+                    }
+                }
+            }
+        }
+
+        key.map(|k| Hotkey { ctrl, alt, shift, meta, key: k })
+    }
+}
+
+const KEY_MAP: &[(KeyCode, char, char)] = &[
+    (KeyCode::KEY_A, 'a', 'A'), (KeyCode::KEY_B, 'b', 'B'), (KeyCode::KEY_C, 'c', 'C'), (KeyCode::KEY_D, 'd', 'D'),
+    (KeyCode::KEY_E, 'e', 'E'), (KeyCode::KEY_F, 'f', 'F'), (KeyCode::KEY_G, 'g', 'G'), (KeyCode::KEY_H, 'h', 'H'),
+    (KeyCode::KEY_I, 'i', 'I'), (KeyCode::KEY_J, 'j', 'J'), (KeyCode::KEY_K, 'k', 'K'), (KeyCode::KEY_L, 'l', 'L'),
+    (KeyCode::KEY_M, 'm', 'M'), (KeyCode::KEY_N, 'n', 'N'), (KeyCode::KEY_O, 'o', 'O'), (KeyCode::KEY_P, 'p', 'P'),
+    (KeyCode::KEY_Q, 'q', 'Q'), (KeyCode::KEY_R, 'r', 'R'), (KeyCode::KEY_S, 's', 'S'), (KeyCode::KEY_T, 't', 'T'),
+    (KeyCode::KEY_U, 'u', 'U'), (KeyCode::KEY_V, 'v', 'V'), (KeyCode::KEY_W, 'w', 'W'), (KeyCode::KEY_X, 'x', 'X'),
+    (KeyCode::KEY_Y, 'y', 'Y'), (KeyCode::KEY_Z, 'z', 'Z'),
+    (KeyCode::KEY_1, '1', '!'), (KeyCode::KEY_2, '2', '@'), (KeyCode::KEY_3, '3', '#'), (KeyCode::KEY_4, '4', '$'),
+    (KeyCode::KEY_5, '5', '%'), (KeyCode::KEY_6, '6', '^'), (KeyCode::KEY_7, '7', '&'), (KeyCode::KEY_8, '8', '*'),
+    (KeyCode::KEY_9, '9', '('), (KeyCode::KEY_0, '0', ')'),
+    (KeyCode::KEY_MINUS, '-', '_'), (KeyCode::KEY_EQUAL, '=', '+'),
+    (KeyCode::KEY_LEFTBRACE, '[', '{'), (KeyCode::KEY_RIGHTBRACE, ']', '}'),
+    (KeyCode::KEY_SEMICOLON, ';', ':'), (KeyCode::KEY_APOSTROPHE, '\'', '"'),
+    (KeyCode::KEY_GRAVE, '`', '~'), (KeyCode::KEY_BACKSLASH, '\\', '|'),
+    (KeyCode::KEY_COMMA, ',', '<'), (KeyCode::KEY_DOT, '.', '>'), (KeyCode::KEY_SLASH, '/', '?'),
+    (KeyCode::KEY_SPACE, ' ', ' '),
+];
+
+pub fn char_to_keycode(c: char) -> Option<KeyCode> {
+    let lower_c = c.to_ascii_lowercase();
+    KEY_MAP.iter().find(|&&(_, normal, shifted)| {
+        normal.to_ascii_lowercase() == lower_c || shifted.to_ascii_lowercase() == lower_c
+    }).map(|&(keycode, _, _)| keycode)
+}
+
 pub fn key_to_char(key: KeyCode, shift: bool) -> Option<char> {
-    let c = match key {
-        KeyCode::KEY_A => 'a', KeyCode::KEY_B => 'b', KeyCode::KEY_C => 'c', KeyCode::KEY_D => 'd',
-        KeyCode::KEY_E => 'e', KeyCode::KEY_F => 'f', KeyCode::KEY_G => 'g', KeyCode::KEY_H => 'h',
-        KeyCode::KEY_I => 'i', KeyCode::KEY_J => 'j', KeyCode::KEY_K => 'k', KeyCode::KEY_L => 'l',
-        KeyCode::KEY_M => 'm', KeyCode::KEY_N => 'n', KeyCode::KEY_O => 'o', KeyCode::KEY_P => 'p',
-        KeyCode::KEY_Q => 'q', KeyCode::KEY_R => 'r', KeyCode::KEY_S => 's', KeyCode::KEY_T => 't',
-        KeyCode::KEY_U => 'u', KeyCode::KEY_V => 'v', KeyCode::KEY_W => 'w', KeyCode::KEY_X => 'x',
-        KeyCode::KEY_Y => 'y', KeyCode::KEY_Z => 'z',
-        KeyCode::KEY_1 => if shift { '!' } else { '1' },
-        KeyCode::KEY_2 => if shift { '@' } else { '2' },
-        KeyCode::KEY_3 => if shift { '#' } else { '3' },
-        KeyCode::KEY_4 => if shift { '$' } else { '4' },
-        KeyCode::KEY_5 => if shift { '%' } else { '5' },
-        KeyCode::KEY_6 => if shift { '^' } else { '6' },
-        KeyCode::KEY_7 => if shift { '&' } else { '7' },
-        KeyCode::KEY_8 => if shift { '*' } else { '8' },
-        KeyCode::KEY_9 => if shift { '(' } else { '9' },
-        KeyCode::KEY_0 => if shift { ')' } else { '0' },
-        KeyCode::KEY_MINUS => if shift { '_' } else { '-' },
-        KeyCode::KEY_EQUAL => if shift { '+' } else { '=' },
-        KeyCode::KEY_LEFTBRACE => if shift { '{' } else { '[' },
-        KeyCode::KEY_RIGHTBRACE => if shift { '}' } else { ']' },
-        KeyCode::KEY_SEMICOLON => if shift { ':' } else { ';' },
-        KeyCode::KEY_APOSTROPHE => if shift { '"' } else { '\'' },
-        KeyCode::KEY_GRAVE => if shift { '~' } else { '`' },
-        KeyCode::KEY_BACKSLASH => if shift { '|' } else { '\\' },
-        KeyCode::KEY_COMMA => if shift { '<' } else { ',' },
-        KeyCode::KEY_DOT => if shift { '>' } else { '.' },
-        KeyCode::KEY_SLASH => if shift { '?' } else { '/' },
-        KeyCode::KEY_SPACE => ' ',
-        _ => return None,
-    };
-    Some(if shift && c.is_ascii_alphabetic() { c.to_ascii_uppercase() } else { c })
+    KEY_MAP.iter().find(|&&(keycode, _, _)| keycode == key)
+        .map(|&(_, normal, shifted)| if shift { shifted } else { normal })
+}
+
+#[derive(Clone)]
+pub enum InputEvent {
+    Expansion(usize, Trigger),
+    AiFix(String),
 }
 
 pub fn find_keyboards() -> Vec<(PathBuf, Device)> {
@@ -60,8 +103,6 @@ pub fn find_keyboards() -> Vec<(PathBuf, Device)> {
         if !keys.contains(KeyCode::KEY_A) || !keys.contains(KeyCode::KEY_Z) { continue }
 
         let name = device.name().unwrap_or("unknown");
-        eprintln!("\x1b[34m⌨️  [input]\x1b[0m Found keyboard: {:?} - {}", path, name);
-
         let name_lower = name.to_lowercase();
         let is_remapper = name_lower.contains("keyd") || name_lower.contains("kmonad") || name_lower.contains("kanata");
 
@@ -73,7 +114,6 @@ pub fn find_keyboards() -> Vec<(PathBuf, Device)> {
     }
 
     if let Some(vkbd) = virtual_kbd {
-        eprintln!("\x1b[35m🔒 [input]\x1b[0m Using virtual keyboard only (keyd/kmonad/kanata detected)");
         vec![vkbd]
     } else {
         keyboards
@@ -86,22 +126,79 @@ pub struct TextExpander {
     max_len: usize,
     shift: bool,
     capslock: bool,
+    ctrl: bool,
+    alt: bool,
+    meta: bool,
+    ai_matches: Vec<(Hotkey, String)>,
 }
 
 impl TextExpander {
-    pub fn new(triggers: HashMap<String, Trigger>) -> Self {
-        let max_len = triggers.keys().map(|k| k.len()).max().unwrap_or(64);
+    pub fn new(
+        triggers: HashMap<String, Trigger>,
+        ai_config: Option<&crate::config::AiConfig>,
+        initial_capslock: bool,
+    ) -> Self {
+        let max_len = triggers.keys().map(|k| k.len()).max().unwrap_or(64) + 1;
         let mut sorted_triggers: Vec<(String, Trigger)> = triggers.into_iter().collect();
-        // Sort by length descending to make trigger matching deterministic (longest match wins)
         sorted_triggers.sort_by(|a, b| {
             b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0))
         });
-        Self { sorted_triggers, buffer: String::with_capacity(max_len + 1), max_len, shift: false, capslock: false }
+
+        let mut ai_matches = Vec::new();
+        if let Some(ai) = ai_config {
+            for m in &ai.matches {
+                if let Some(hk) = Hotkey::parse(&m.hotkey) {
+                    ai_matches.push((hk, m.prompt.clone()));
+                } else {
+                    eprintln!("\x1b[33m⚠️  [config] Warning:\x1b[0m Failed to parse hotkey: {}", m.hotkey);
+                }
+            }
+        }
+
+        Self {
+            sorted_triggers,
+            buffer: String::with_capacity(max_len),
+            max_len,
+            shift: false,
+            capslock: initial_capslock,
+            ctrl: false,
+            alt: false,
+            meta: false,
+            ai_matches,
+        }
     }
 
-    pub fn process(&mut self, key: KeyCode, pressed: bool) -> Option<(usize, Trigger)> {
+    fn update_modifiers_down(&self) {
+        let mut mask = 0;
+        if self.ctrl { mask |= 1; }
+        if self.alt { mask |= 2; }
+        if self.shift { mask |= 4; }
+        if self.meta { mask |= 8; }
+        MODIFIERS_DOWN.store(mask, Ordering::SeqCst);
+    }
+
+    pub fn process(&mut self, key: KeyCode, pressed: bool) -> Option<InputEvent> {
         if key == KeyCode::KEY_LEFTSHIFT || key == KeyCode::KEY_RIGHTSHIFT {
             self.shift = pressed;
+            self.update_modifiers_down();
+            return None;
+        }
+
+        if key == KeyCode::KEY_LEFTCTRL || key == KeyCode::KEY_RIGHTCTRL {
+            self.ctrl = pressed;
+            self.update_modifiers_down();
+            return None;
+        }
+
+        if key == KeyCode::KEY_LEFTALT || key == KeyCode::KEY_RIGHTALT {
+            self.alt = pressed;
+            self.update_modifiers_down();
+            return None;
+        }
+
+        if key == KeyCode::KEY_LEFTMETA || key == KeyCode::KEY_RIGHTMETA {
+            self.meta = pressed;
+            self.update_modifiers_down();
             return None;
         }
 
@@ -110,10 +207,27 @@ impl TextExpander {
             return None;
         }
 
+        if pressed {
+            for (hk, prompt) in &self.ai_matches {
+                if self.ctrl == hk.ctrl && self.alt == hk.alt && self.shift == hk.shift && self.meta == hk.meta && key == hk.key {
+                    self.buffer.clear();
+                    return Some(InputEvent::AiFix(prompt.clone()));
+                }
+            }
+        }
+
         if !pressed { return None }
 
+        if self.ctrl || self.alt || self.meta {
+            self.buffer.clear();
+            return None;
+        }
+
         match key {
-            KeyCode::KEY_ENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC => {
+            KeyCode::KEY_ENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC |
+            KeyCode::KEY_LEFT | KeyCode::KEY_RIGHT | KeyCode::KEY_UP | KeyCode::KEY_DOWN |
+            KeyCode::KEY_HOME | KeyCode::KEY_END | KeyCode::KEY_PAGEUP | KeyCode::KEY_PAGEDOWN |
+            KeyCode::KEY_DELETE => {
                 self.buffer.clear();
                 return None;
             }
@@ -124,7 +238,6 @@ impl TextExpander {
             _ => {}
         }
 
-        // Caps Lock only inverts the shift state for alphabetic keys.
         let is_alphabetic = matches!(
             key,
             KeyCode::KEY_A | KeyCode::KEY_B | KeyCode::KEY_C | KeyCode::KEY_D |
@@ -150,7 +263,6 @@ impl TextExpander {
 
             for (trig, data) in &self.sorted_triggers {
                 if self.buffer.ends_with(trig) {
-                    // Word boundary check: if trigger starts with alphanumeric, preceding char must not be alphanumeric
                     if let Some(first_char) = trig.chars().next() {
                         if first_char.is_alphanumeric() {
                             let start_idx = self.buffer.len() - trig.len();
@@ -164,12 +276,89 @@ impl TextExpander {
                         }
                     }
 
-                    let result = (trig.len(), data.clone());
+                    let result = InputEvent::Expansion(trig.len(), data.clone());
                     self.buffer.clear();
                     return Some(result);
                 }
             }
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_expansion() {
+        let mut triggers = HashMap::new();
+        triggers.insert(";ip".to_string(), Trigger {
+            replace: "127.0.0.1".to_string(),
+            vars: std::sync::Arc::new(vec![]),
+        });
+        triggers.insert(";date".to_string(), Trigger {
+            replace: "2026-07-16".to_string(),
+            vars: std::sync::Arc::new(vec![]),
+        });
+
+        let mut expander = TextExpander::new(triggers, None, false);
+
+        assert!(expander.process(KeyCode::KEY_A, true).is_none());
+        assert!(expander.process(KeyCode::KEY_A, false).is_none());
+
+        assert!(expander.process(KeyCode::KEY_SEMICOLON, true).is_none());
+        assert!(expander.process(KeyCode::KEY_SEMICOLON, false).is_none());
+        assert!(expander.process(KeyCode::KEY_I, true).is_none());
+        assert!(expander.process(KeyCode::KEY_I, false).is_none());
+        
+        let ev = expander.process(KeyCode::KEY_P, true);
+        assert!(ev.is_some());
+        if let Some(InputEvent::Expansion(len, trig)) = ev {
+            assert_eq!(len, 3);
+            assert_eq!(trig.replace, "127.0.0.1");
+        } else {
+            panic!("Expected expansion event");
+        }
+    }
+
+    #[test]
+    fn test_word_boundary_longest_trigger() {
+        let mut triggers = HashMap::new();
+        triggers.insert("ip".to_string(), Trigger {
+            replace: "127.0.0.1".to_string(),
+            vars: std::sync::Arc::new(vec![]),
+        });
+        let mut expander = TextExpander::new(triggers, None, false);
+
+        assert!(expander.process(KeyCode::KEY_A, true).is_none());
+        assert!(expander.process(KeyCode::KEY_A, false).is_none());
+
+        assert!(expander.process(KeyCode::KEY_I, true).is_none());
+        assert!(expander.process(KeyCode::KEY_I, false).is_none());
+
+        let ev = expander.process(KeyCode::KEY_P, true);
+        assert!(ev.is_none());
+    }
+
+    #[test]
+    fn test_modifier_pollution() {
+        let mut triggers = HashMap::new();
+        triggers.insert("v".to_string(), Trigger {
+            replace: "paste".to_string(),
+            vars: std::sync::Arc::new(vec![]),
+        });
+        let mut expander = TextExpander::new(triggers, None, false);
+
+        assert!(expander.process(KeyCode::KEY_LEFTCTRL, true).is_none());
+
+        let ev = expander.process(KeyCode::KEY_V, true);
+        assert!(ev.is_none());
+        assert!(expander.process(KeyCode::KEY_V, false).is_none());
+
+        assert!(expander.process(KeyCode::KEY_LEFTCTRL, false).is_none());
+
+        let ev = expander.process(KeyCode::KEY_V, true);
+        assert!(ev.is_some());
     }
 }

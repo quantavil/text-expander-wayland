@@ -23,7 +23,7 @@ Supports the most commonly used espanso match features (simple triggers, variabl
 ## Requirements
 
 - Linux + Wayland
-- `wtype` (text injection)
+- `wtype` or `ydotool` (text injection; `ydotool` is preferred if running)
 - `wl-paste` (clipboard variable support)
 - Root access for `/dev/input/event*`
 
@@ -157,7 +157,7 @@ Simple trigger/replace matches and basic variable types will work as-is. Matches
 
 ```ini
 [Unit]
-Description=Text Expander
+Description=Text Expander Daemon
 After=graphical.target
 
 [Service]

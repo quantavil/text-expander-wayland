@@ -1,26 +1,43 @@
 use std::{fs, os::unix::io::AsRawFd, process};
 
 pub fn daemonize() {
-    // Fork and exit parent
     match unsafe { libc::fork() } {
-        -1 => { eprintln!("Fork failed"); process::exit(1); }
-        0 => {} // Child continues
-        _ => process::exit(0), // Parent exits
+        -1 => {
+            eprintln!("First fork failed");
+            process::exit(1);
+        }
+        0 => {}
+        _ => process::exit(0),
     }
 
-    // Create new session
     if unsafe { libc::setsid() } == -1 {
         eprintln!("setsid failed");
         process::exit(1);
     }
 
-    // Redirect stdio to /dev/null
-    let devnull = fs::OpenOptions::new()
-        .read(true).write(true).open("/dev/null").unwrap();
+    match unsafe { libc::fork() } {
+        -1 => {
+            eprintln!("Second fork failed");
+            process::exit(1);
+        }
+        0 => {}
+        _ => process::exit(0),
+    }
 
-    unsafe {
-        libc::dup2(devnull.as_raw_fd(), 0);
-        libc::dup2(devnull.as_raw_fd(), 1);
-        libc::dup2(devnull.as_raw_fd(), 2);
+    if unsafe { libc::chdir(c"/".as_ptr()) } != 0 {
+        eprintln!("chdir failed");
+        process::exit(1);
+    }
+
+    if let Ok(devnull) = fs::OpenOptions::new().read(true).write(true).open("/dev/null") {
+        let fd = devnull.as_raw_fd();
+        unsafe {
+            libc::dup2(fd, 0);
+            libc::dup2(fd, 1);
+            libc::dup2(fd, 2);
+        }
+    } else {
+        eprintln!("Failed to open /dev/null");
+        process::exit(1);
     }
 }

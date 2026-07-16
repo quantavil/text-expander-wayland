@@ -8,9 +8,13 @@ description = "Minimal Wayland text expander compatible with espanso config form
 [dependencies]
 evdev = "0.13"
 serde = { version = "1.0", features = ["derive"] }
-serde-saphyr = "0.0"
+serde_norway = "0.9"
 libc = "0.2"
+serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 
 [profile.release]
 lto = true
 strip = true
+codegen-units = 1
+panic = "abort"

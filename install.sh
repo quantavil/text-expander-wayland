@@ -101,12 +101,23 @@ matches:
         type: shell
         params:
           cmd: |-
-            grep -r -h -E 'triggers?:' ~/.config/text_expander/ | sed -E 's/.*triggers?:\s*//; s/,/\n/g' | tr -d '[]\" ' | sort -u
+            grep -r -h -E '[t]riggers?:' ~/.config/text_expander/ | sed -E 's/.*triggers?:\s*//; s/,/\n/g' | tr -d '[]\" ' | sort -u
+
+# AI text processing hotkeys (uncomment and configure to activate)
+# ai:
+#   api_key: "your-gemini-api-key"
+#   # endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" # Optional, defaults to Gemini
+#   # model: "gemini-3.1-flash-lite" # Optional, defaults to gemini-3.1-flash-lite
+#   matches:
+#     - hotkey: "ctrl+alt+f"
+#       prompt: "You are a professional editor. Correct any grammar, spelling, or punctuation errors in the text below. Keep the original meaning and tone. Respond ONLY with the corrected text and absolutely nothing else. Do not add quotes, explanations, or markdown formatting."
+#     - hotkey: "ctrl+alt+s"
+#       prompt: "Summarize the text below concisely. Respond ONLY with the summary."
 EOF
 fi
 
 # Ensure correct ownership of the config directory and files so the user can edit them
-chown -R $REAL_USER:$REAL_USER "$CONFIG_DIR"
+chown -R "$REAL_USER:$REAL_USER" "$CONFIG_DIR"
 
 # 3. Create systemd service
 echo "Creating systemd service at $SERVICE_PATH..."
@@ -134,7 +145,7 @@ systemctl enable text_expander
 systemctl restart text_expander
 
 echo "Service status:"
-systemctl status text_expander --no-pager
+systemctl status text_expander --no-pager || true
 
 echo "=== Installation complete! ==="
 echo "You can edit your triggers in $CONFIG_DIR/base.yml"
