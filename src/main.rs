@@ -19,11 +19,39 @@ static AI_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        println!("Usage: text_expander [OPTIONS]");
+        println!();
+        println!("Options:");
+        println!("  -d, --daemon           Run in background as daemon");
+        println!("  -t, --list-triggers    List all loaded triggers and exit");
+        println!("  -v, --version          Show version information and exit");
+        println!("  -h, --help             Show this help menu and exit");
+        process::exit(0);
+    }
+
+    if args.iter().any(|a| a == "-v" || a == "--version") {
+        println!("text_expander {}", env!("CARGO_PKG_VERSION"));
+        process::exit(0);
+    }
+
     let daemon_mode = args.iter().any(|a| a == "-d" || a == "--daemon");
+
+    let config = load_configs();
+
+    if args.iter().any(|a| a == "-t" || a == "--list-triggers") {
+        println!("Loaded triggers ({}):", config.triggers.len());
+        let mut sorted_keys: Vec<_> = config.triggers.keys().collect();
+        sorted_keys.sort();
+        for trigger in sorted_keys {
+            println!("  {}", trigger);
+        }
+        process::exit(0);
+    }
 
     eprintln!("\x1b[1m🚀 [text_expander]\x1b[0m lightweight espanso replacement for Wayland");
 
-    let config = load_configs();
     if config.triggers.is_empty() {
         eprintln!("\x1b[31m❌ [config] Error:\x1b[0m No triggers loaded. Create config in ~/.config/text_expander/");
         process::exit(1);
