@@ -1,8 +1,10 @@
-mod ai;
-mod config;
-mod daemon;
-mod inject;
-mod input;
+use text_expander::{
+    ai,
+    config::load_configs,
+    daemon::daemonize,
+    inject::type_expansion,
+    input::{find_keyboards, TextExpander, InputEvent},
+};
 
 use evdev::{EventType, KeyCode};
 use std::{
@@ -14,11 +16,6 @@ use std::{
 };
 
 static AI_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
-
-use config::load_configs;
-use daemon::daemonize;
-use inject::type_expansion;
-use input::{find_keyboards, TextExpander};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -129,7 +126,7 @@ fn main() {
                         if val == 0 || val == 1 {
                             if let Some(event) = expander.process(KeyCode::new(ev.code()), val == 1) {
                                 match event {
-                                    input::InputEvent::Expansion(n, trigger) => {
+                                    InputEvent::Expansion(n, trigger) => {
                                         let tx_typist = tx.clone();
                                         let last_key = Some(KeyCode::new(ev.code()));
                                         thread::spawn(move || {
@@ -139,7 +136,7 @@ fn main() {
                                             }
                                         });
                                     }
-                                    input::InputEvent::AiFix(prompt) => {
+                                    InputEvent::AiFix(prompt) => {
                                         if !AI_IN_FLIGHT.swap(true, Ordering::SeqCst) {
                                             let ai_config = config.ai.clone().unwrap();
                                             thread::spawn(move || {

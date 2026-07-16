@@ -103,16 +103,14 @@ matches:
           cmd: |-
             grep -r -h -E '[t]riggers?:' ~/.config/text_expander/ | sed -E 's/.*triggers?:\s*//; s/,/\n/g' | tr -d '[]\" ' | sort -u
 
-# AI text processing hotkeys (uncomment and configure to activate)
-# ai:
-#   api_key: "your-gemini-api-key"
-#   # endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" # Optional, defaults to Gemini
-#   # model: "gemini-3.1-flash-lite" # Optional, defaults to gemini-3.1-flash-lite
-#   matches:
-#     - hotkey: "ctrl+alt+f"
-#       prompt: "You are a professional editor. Correct any grammar, spelling, or punctuation errors in the text below. Keep the original meaning and tone. Respond ONLY with the corrected text and absolutely nothing else. Do not add quotes, explanations, or markdown formatting."
-#     - hotkey: "ctrl+alt+s"
-#       prompt: "Summarize the text below concisely. Respond ONLY with the summary."
+# AI text processing hotkeys
+ai:
+  api_key: "your-gemini-api-key"
+  endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" # Optional, defaults to Gemini
+  model: "gemini-3.1-flash-lite" # Optional, defaults to gemini-3.1-flash-lite
+  matches:
+    - hotkey: "ctrl+alt+f"
+      prompt: "You are a professional editor. Correct any grammar, spelling, or punctuation errors in the text below. Keep the original meaning and tone. Respond ONLY with the corrected text and absolutely nothing else. Do not add quotes, explanations, or markdown formatting."
 EOF
 fi
 
