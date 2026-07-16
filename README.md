@@ -27,25 +27,23 @@ Supports the most commonly used espanso match features (simple triggers, variabl
 - `wl-paste` (clipboard variable support)
 - Root access for `/dev/input/event*`
 
-## Build
-
-```bash
-cargo build --release
-```
-
 ## Installation & Updating
 
-To install or update an existing installation/daemon:
+To build, install, or update the daemon:
 
 ```bash
+# Build the binary
+cargo build --release
+
+# Run the install script (requires root/sudo)
 sudo ./install.sh
 ```
 
-This script will automatically:
-1. Stop the running daemon if it exists.
-2. Copy the new binary to `/usr/local/bin/text_expander`.
-3. Set up the systemd service configuration at `/etc/systemd/system/text_expander.service`.
-4. Reload systemd, enable, and start the daemon.
+The `install.sh` script automatically:
+1. Stops the running daemon service if active.
+2. Copies the compiled release binary to `/usr/local/bin/text_expander`.
+3. Creates and configures the systemd service at `/etc/systemd/system/text_expander.service` (setting up the correct user privileges, environments, and home directory).
+4. Reloads systemd configuration, enables, and starts the background service.
 
 Your trigger configurations will remain preserved in `~/.config/text_expander/`.
 
@@ -153,27 +151,17 @@ Simple trigger/replace matches and basic variable types will work as-is. Matches
 2. Buffers keystrokes and matches against triggers
 3. On match: sends backspaces to delete trigger, types replacement via `wtype`
 
-## Systemd Service
+## Managing the Service
 
-`/etc/systemd/system/text_expander.service`:
-
-```ini
-[Unit]
-Description=Text Expander Daemon
-After=graphical.target
-
-[Service]
-ExecStart=/usr/local/bin/text_expander
-Restart=always
-Environment=SUDO_USER=yourusername
-Environment=SUDO_UID=1000
-
-[Install]
-WantedBy=graphical.target
-```
+The installation script configures `text_expander` as a systemd service. You can manage it using standard systemctl commands:
 
 ```bash
-sudo systemctl enable --now text_expander
+# Restart the daemon (e.g. after modifying triggers)
+sudo systemctl restart text_expander
+
+# Check service logs and status
+sudo systemctl status text_expander
+journalctl -u text_expander -f
 ```
 
 ## License
