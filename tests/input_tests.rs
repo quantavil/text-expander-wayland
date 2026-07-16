@@ -104,3 +104,11 @@ fn test_hotkey_parse_invalid() {
     assert!(Hotkey::parse("invalid_mod").is_none());
 }
 
+#[test]
+fn test_keypad_keys_mapped() {
+    use text_expander::input::key_to_char;
+    assert_eq!(key_to_char(KeyCode::KEY_KP1, false), Some('1'));
+    assert_eq!(key_to_char(KeyCode::KEY_KPPLUS, false), Some('+'));
+}
+
+

@@ -268,12 +268,21 @@ pub fn load_configs() -> Config {
 pub fn get_config_path() -> PathBuf {
     let home = get_sudo_user()
         .and_then(|user| {
-            fs::read_to_string("/etc/passwd").ok().and_then(|passwd| {
-                passwd.lines()
-                    .find(|l| l.starts_with(&format!("{}:", user)))
-                    .and_then(|l| l.split(':').nth(5))
-                    .map(String::from)
-            })
+            let c_user = std::ffi::CString::new(user.as_str()).ok()?;
+            unsafe {
+                let pwd = libc::getpwnam(c_user.as_ptr());
+                if !pwd.is_null() {
+                    let home_ptr = (*pwd).pw_dir;
+                    if !home_ptr.is_null() {
+                        let c_str = std::ffi::CStr::from_ptr(home_ptr);
+                        c_str.to_str().ok().map(String::from)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
         })
         .or_else(|| env::var("HOME").ok())
         .unwrap_or_else(|| "/tmp".into());

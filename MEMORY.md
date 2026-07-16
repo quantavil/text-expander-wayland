@@ -41,3 +41,5 @@ text_expander/
 
 ## Blunders
 - 2026-07-16: Placed AI and input unit tests inside `src/ai.rs` and `src/input.rs`, which cluttered production code. Exposing the library crate `lib.rs` and moving all tests to `tests/ai_tests.rs` and `tests/input_tests.rs` resolved this.
+- 2026-07-16: Fixed overlapping clipboard expansion race condition, modifier wait handling, NSS home directory resolution, keypad desync issues, and asynchronous cancellation of shell expansions.
+

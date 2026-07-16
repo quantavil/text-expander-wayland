@@ -11,10 +11,11 @@ use std::{
     os::unix::io::AsRawFd,
     process,
     thread,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 static AI_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+static KEY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -145,15 +146,21 @@ fn main() {
                     if ev.event_type() == EventType::KEY {
                         let val = ev.value();
                         if val == 0 || val == 1 {
+                            KEY_COUNT.fetch_add(1, Ordering::SeqCst);
                             if let Some(event) = expander.process(KeyCode::new(ev.code()), val == 1) {
                                 match event {
                                     InputEvent::Expansion(n, trigger) => {
                                         let tx_typist = tx.clone();
                                         let last_key = Some(KeyCode::new(ev.code()));
+                                        let start_key_count = KEY_COUNT.load(Ordering::SeqCst);
                                         thread::spawn(move || {
                                             let text = trigger.expand();
-                                            if let Err(e) = tx_typist.send((n, text, last_key)) {
-                                                eprintln!("\x1b[31m❌ [input] Error:\x1b[0m Failed to send expansion to typist: {}", e);
+                                            if KEY_COUNT.load(Ordering::SeqCst) == start_key_count {
+                                                if let Err(e) = tx_typist.send((n, text, last_key)) {
+                                                    eprintln!("\x1b[31m❌ [input] Error:\x1b[0m Failed to send expansion to typist: {}", e);
+                                                }
+                                            } else {
+                                                eprintln!("\x1b[33m⚠️  [input]\x1b[0m Expansion cancelled: user typed during evaluation");
                                             }
                                         });
                                     }

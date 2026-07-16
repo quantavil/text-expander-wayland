@@ -14,6 +14,9 @@ const CLIPBOARD_PASTE_THRESHOLD: usize = 25;
 const KEY_CONFLICT_CHECK_LEN: usize = 25;
 const TYPING_DELAY_MS: u64 = 30;
 
+static ACTIVE_CLIPBOARD_EXPANSIONS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static ORIGINAL_CLIPBOARD: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
 const KEYCODE_LEFTCTRL: u16 = 29;
 const KEYCODE_C: u16 = 46;
 const KEYCODE_V: u16 = 47;
@@ -47,6 +50,13 @@ pub fn run_wtype(args: &[&str]) {
 pub fn get_ydotool_socket_path() -> Option<&'static PathBuf> {
     static CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
     CACHE.get_or_init(|| {
+        if let Ok(socket_env) = env::var("YDOTOOL_SOCKET") {
+            let path = PathBuf::from(socket_env);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+
         let real_uid = env::var("SUDO_UID").unwrap_or_default();
         let uid = if !real_uid.is_empty() {
             real_uid
@@ -137,6 +147,13 @@ pub fn has_key_conflict(text: &str, last_key: Option<KeyCode>) -> bool {
 }
 
 pub fn type_expansion(backspaces: usize, text: &str, last_key: Option<KeyCode>, force_paste: bool) {
+    for _ in 0..50 {
+        if crate::input::MODIFIERS_DOWN.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+
     let (actual_text, cursor_moves) = if let Some(pos) = text.find("$|$") {
         let prefix = &text[..pos];
         let suffix = &text[pos + 3..];
@@ -153,8 +170,16 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: Option<KeyCode>, 
         || has_key_conflict(&actual_text, last_key);
 
     if use_paste {
-        let saved_clipboard = run_command("wl-paste", &["-n"]);
-        let is_clipboard_identical = actual_text == saved_clipboard;
+        let current_clipboard = run_command("wl-paste", &["-n"]);
+
+        if ACTIVE_CLIPBOARD_EXPANSIONS.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            let mut guard = ORIGINAL_CLIPBOARD.lock().unwrap();
+            *guard = current_clipboard.clone();
+        }
+
+        ACTIVE_CLIPBOARD_EXPANSIONS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let is_clipboard_identical = actual_text == current_clipboard;
 
         if !is_clipboard_identical {
             copy_to_clipboard(&actual_text);
@@ -172,13 +197,13 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: Option<KeyCode>, 
             simulate_cursor_move(cursor_moves);
         }
 
-        if !is_clipboard_identical {
-            let saved = saved_clipboard;
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(800));
-                copy_to_clipboard(&saved);
-            });
-        }
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(800));
+            if ACTIVE_CLIPBOARD_EXPANSIONS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+                let guard = ORIGINAL_CLIPBOARD.lock().unwrap();
+                copy_to_clipboard(&guard);
+            }
+        });
     } else {
         simulate_backspaces(backspaces);
         simulate_type_fallback(&actual_text);

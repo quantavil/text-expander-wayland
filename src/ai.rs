@@ -108,9 +108,8 @@ pub fn trigger_ai_fix(prompt: &str, ai_config: &AiConfig) -> Result<(), Box<dyn 
         return Ok(());
     }
 
-    let api_key = validate_api_key(ai_config).map_err(|e| {
+    let api_key = validate_api_key(ai_config).inspect_err(|_| {
         copy_to_clipboard(&original_clipboard);
-        e
     })?;
 
     let endpoint = resolve_endpoint(ai_config);
@@ -138,9 +137,8 @@ pub fn trigger_ai_fix(prompt: &str, ai_config: &AiConfig) -> Result<(), Box<dyn 
     }
 
     let response_str = String::from_utf8(output.stdout)?;
-    let corrected_text = parse_ai_response(&response_str).map_err(|e| {
+    let corrected_text = parse_ai_response(&response_str).inspect_err(|_| {
         copy_to_clipboard(&original_clipboard);
-        e
     })?;
 
     copy_to_clipboard(&corrected_text);

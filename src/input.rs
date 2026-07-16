@@ -65,6 +65,11 @@ const KEY_MAP: &[(KeyCode, char, char)] = &[
     (KeyCode::KEY_GRAVE, '`', '~'), (KeyCode::KEY_BACKSLASH, '\\', '|'),
     (KeyCode::KEY_COMMA, ',', '<'), (KeyCode::KEY_DOT, '.', '>'), (KeyCode::KEY_SLASH, '/', '?'),
     (KeyCode::KEY_SPACE, ' ', ' '),
+    (KeyCode::KEY_KP0, '0', '0'), (KeyCode::KEY_KP1, '1', '1'), (KeyCode::KEY_KP2, '2', '2'), (KeyCode::KEY_KP3, '3', '3'),
+    (KeyCode::KEY_KP4, '4', '4'), (KeyCode::KEY_KP5, '5', '5'), (KeyCode::KEY_KP6, '6', '6'), (KeyCode::KEY_KP7, '7', '7'),
+    (KeyCode::KEY_KP8, '8', '8'), (KeyCode::KEY_KP9, '9', '9'),
+    (KeyCode::KEY_KPASTERISK, '*', '*'), (KeyCode::KEY_KPMINUS, '-', '-'), (KeyCode::KEY_KPPLUS, '+', '+'),
+    (KeyCode::KEY_KPDOT, '.', '.'), (KeyCode::KEY_KPSLASH, '/', '/'), (KeyCode::KEY_KPEQUAL, '=', '='),
 ];
 
 pub fn char_to_keycode(c: char) -> Option<KeyCode> {
@@ -224,7 +229,7 @@ impl TextExpander {
         }
 
         match key {
-            KeyCode::KEY_ENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC |
+            KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER | KeyCode::KEY_TAB | KeyCode::KEY_ESC |
             KeyCode::KEY_LEFT | KeyCode::KEY_RIGHT | KeyCode::KEY_UP | KeyCode::KEY_DOWN |
             KeyCode::KEY_HOME | KeyCode::KEY_END | KeyCode::KEY_PAGEUP | KeyCode::KEY_PAGEDOWN |
             KeyCode::KEY_DELETE => {

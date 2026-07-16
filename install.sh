@@ -36,6 +36,7 @@ fi
 # 2. Setup config directory and starter base.yml
 echo "Setting up configuration directory at $CONFIG_DIR..."
 mkdir -p "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR"
 
 if [ ! -f "$CONFIG_DIR/base.yml" ]; then
     echo "Creating starter configuration in $CONFIG_DIR/base.yml..."
@@ -162,6 +163,10 @@ fi
 # Ensure correct ownership of the config directory and files so the user can edit them
 chown -R "$REAL_USER:$REAL_USER" "$CONFIG_DIR"
 
+# Ensure secure permissions so other users cannot read config containing API keys
+find "$CONFIG_DIR" -type d -exec chmod 700 {} +
+find "$CONFIG_DIR" -type f -exec chmod 600 {} +
+
 # 3. Create systemd service
 echo "Creating systemd service at $SERVICE_PATH..."
 cat << EOF > "$SERVICE_PATH"
@@ -174,6 +179,7 @@ ExecStart=$BINARY_DST
 Restart=always
 Environment=SUDO_USER=$REAL_USER
 Environment=SUDO_UID=$REAL_UID
+Environment=HOME=$REAL_HOME
 
 [Install]
 WantedBy=graphical.target
