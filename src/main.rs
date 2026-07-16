@@ -1,7 +1,6 @@
 use text_expander::{
     ai,
     config::load_configs,
-    daemon::daemonize,
     inject::type_expansion,
     input::{find_keyboards, TextExpander, InputEvent},
 };
@@ -24,7 +23,6 @@ fn main() {
         println!("Usage: text_expander [OPTIONS]");
         println!();
         println!("Options:");
-        println!("  -d, --daemon           Run in background as daemon");
         println!("  -t, --list-triggers    List all loaded triggers and exit");
         println!("  -v, --version          Show version information and exit");
         println!("  -h, --help             Show this help menu and exit");
@@ -36,7 +34,7 @@ fn main() {
         process::exit(0);
     }
 
-    let daemon_mode = args.iter().any(|a| a == "-d" || a == "--daemon");
+
 
     let config = load_configs();
 
@@ -78,12 +76,7 @@ fn main() {
         }
     }
 
-    if daemon_mode {
-        eprintln!("\x1b[34mℹ️  [daemon]\x1b[0m Daemonizing...");
-        daemonize();
-    } else {
-        eprintln!("\x1b[32m🟢 [daemon]\x1b[0m Ready! (use -d/--daemon to run in background)");
-    }
+    eprintln!("\x1b[32m🟢 [daemon]\x1b[0m Ready!");
 
     let mut expander = TextExpander::new(config.triggers, config.ai.as_deref(), initial_capslock);
 

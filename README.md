@@ -52,13 +52,11 @@ Your trigger configurations will remain preserved in `~/.config/text_expander/`.
 ## Usage
 
 ```bash
-sudo text_expander                    # Run in foreground
-sudo text_expander --daemon           # Run in background (as daemon)
-sudo text_expander --list-triggers    # List all loaded triggers and exit
-sudo text_expander --version          # Show version information and exit
-sudo text_expander --help             # Show usage help menu and exit
+text_expander                    # Run (foreground)
+text_expander --list-triggers    # List all loaded triggers and exit
+text_expander --version          # Show version
+text_expander --help             # Show help
 ```
-
 
 ## Config
 
