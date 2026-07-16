@@ -6,7 +6,8 @@ REAL_USER=${SUDO_USER:-$(whoami)}
 REAL_UID=${SUDO_UID:-$(id -u)}
 REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
-BINARY_SRC="$(pwd)/target/release/text_expander"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BINARY_SRC="$SCRIPT_DIR/target/release/text_expander"
 BINARY_DST="/usr/local/bin/text_expander"
 CONFIG_DIR="$REAL_HOME/.config/text_expander"
 SERVICE_PATH="/etc/systemd/system/text_expander.service"

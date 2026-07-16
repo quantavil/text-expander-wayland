@@ -99,7 +99,7 @@ impl TextExpander {
         Self { sorted_triggers, buffer: String::with_capacity(max_len + 1), max_len, shift: false, capslock: false }
     }
 
-    pub fn process(&mut self, key: KeyCode, pressed: bool) -> Option<(usize, String)> {
+    pub fn process(&mut self, key: KeyCode, pressed: bool) -> Option<(usize, Trigger)> {
         if key == KeyCode::KEY_LEFTSHIFT || key == KeyCode::KEY_RIGHTSHIFT {
             self.shift = pressed;
             return None;
@@ -164,7 +164,7 @@ impl TextExpander {
                         }
                     }
 
-                    let result = (trig.len(), data.expand());
+                    let result = (trig.len(), data.clone());
                     self.buffer.clear();
                     return Some(result);
                 }

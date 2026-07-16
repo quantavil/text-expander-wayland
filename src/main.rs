@@ -45,6 +45,15 @@ fn main() {
 
     let mut expander = TextExpander::new(triggers);
 
+    let (tx, rx) = std::sync::mpsc::channel::<(usize, config::Trigger, KeyCode)>();
+    thread::spawn(move || {
+        while let Ok((n, trigger, last_key)) = rx.recv() {
+            thread::sleep(Duration::from_millis(10));
+            let text = trigger.expand();
+            type_expansion(n, &text, last_key);
+        }
+    });
+
     loop {
         let raw_fds: Vec<i32> = keyboards.iter().map(|(_, k)| k.as_raw_fd()).collect();
         let mut pollfds: Vec<libc::pollfd> = raw_fds.iter()
@@ -90,9 +99,8 @@ fn main() {
             if let Ok(events) = keyboards[i].1.fetch_events() {
                 for ev in events {
                     if ev.event_type() == EventType::KEY {
-                        if let Some((n, text)) = expander.process(KeyCode::new(ev.code()), ev.value() == 1) {
-                            thread::sleep(Duration::from_millis(10));
-                            type_expansion(n, &text, KeyCode::new(ev.code()));
+                        if let Some((n, trigger)) = expander.process(KeyCode::new(ev.code()), ev.value() == 1) {
+                            let _ = tx.send((n, trigger, KeyCode::new(ev.code())));
                         }
                     }
                 }

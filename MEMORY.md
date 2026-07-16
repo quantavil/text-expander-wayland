@@ -28,7 +28,7 @@ text_expander/
 - Requires Rust/Cargo to compile.
 - Requires `wtype` and `wl-paste` to be installed on the system.
 - Requires root privileges (`sudo`) to read from `/dev/input/*`.
-- Rust dependencies: `evdev` (0.12) for handling input events, `serde` and `serde_yaml` for config loading, and `libc` (0.2) for raw system functions.
+- Rust dependencies: `evdev` (0.13) for handling input events, `serde` and `serde-saphyr` for config loading, and `libc` (0.2) for raw system functions.
 
 ## Critical Information
 - **Root Permissions:** Since it reads directly from `/dev/input/event*`, it must run with root permissions. If run via `sudo`, it retrieves the real user's environment to launch `wtype` via the user's Wayland socket.

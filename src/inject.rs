@@ -48,23 +48,19 @@ pub fn run_wtype(args: &[&str]) {
 
 pub fn get_ydotool_socket_path() -> Option<PathBuf> {
     let real_uid = env::var("SUDO_UID").unwrap_or_default();
-    let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
-        xdg
-    } else if !real_uid.is_empty() {
-        format!("/run/user/{}", real_uid)
+    let uid = if !real_uid.is_empty() {
+        real_uid
     } else {
-        String::new()
+        unsafe { libc::getuid() }.to_string()
     };
 
-    if !xdg_runtime.is_empty() {
-        let path = PathBuf::from(&xdg_runtime).join(".ydotool_socket");
-        if path.exists() {
-            return Some(path);
-        }
-    }
+    let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
+        xdg
+    } else {
+        format!("/run/user/{}", uid)
+    };
 
-    // Direct fallback check for uid 1000
-    let path = PathBuf::from("/run/user/1000/.ydotool_socket");
+    let path = PathBuf::from(&xdg_runtime).join(".ydotool_socket");
     if path.exists() {
         return Some(path);
     }
@@ -77,9 +73,7 @@ pub fn has_key_conflict(text: &str, last_key: KeyCode) -> bool {
     let tc_upper = key_to_char(last_key, true).unwrap_or(tc_lower);
 
     // Check if the trigger key character appears (case-insensitively) in the first 15 characters
-    let prefix_len = std::cmp::min(text.len(), 15);
-    let prefix = &text[..prefix_len];
-    prefix.contains(tc_lower) || prefix.contains(tc_upper)
+    text.chars().take(15).any(|c| c == tc_lower || c == tc_upper)
 }
 
 pub fn type_expansion(backspaces: usize, text: &str, last_key: KeyCode) {

@@ -141,9 +141,10 @@ pub fn get_wayland_env() -> Vec<(String, String)> {
 
 pub fn load_yaml_recursive(dir: &PathBuf, triggers: &mut HashMap<String, Trigger>, global_vars: &mut Vec<Var>) {
     let Ok(entries) = fs::read_dir(dir) else { return };
+    let mut paths: Vec<_> = entries.flatten().map(|e| e.path()).collect();
+    paths.sort();
 
-    for entry in entries.flatten() {
-        let path = entry.path();
+    for path in paths {
         if path.is_dir() {
             load_yaml_recursive(&path, triggers, global_vars);
         } else if path.extension().map_or(false, |e| e == "yaml" || e == "yml") {

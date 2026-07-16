@@ -16,6 +16,8 @@ It is extremely resource-efficient, consuming only **~1.7 MB - 3.4 MB** of RAM a
 | **Advanced Features** | No (Regex triggers, forms, scripts) | Supported |
 | **System Overhead** | Negligible | Moderate |
 
+*Note: Memory usage verified on active daemon via `ps aux` showing RSS of ~2.6 MB.*
+
 Supports the most commonly used espanso match features (simple triggers, variables, shell commands). Advanced features like regex triggers, forms, and app-specific configs are not supported.
 
 ## Requirements
@@ -29,8 +31,23 @@ Supports the most commonly used espanso match features (simple triggers, variabl
 
 ```bash
 cargo build --release
-sudo cp target/release/text_expander /usr/local/bin/
 ```
+
+## Installation & Updating
+
+To install or update an existing installation/daemon:
+
+```bash
+sudo ./install.sh
+```
+
+This script will automatically:
+1. Stop the running daemon if it exists.
+2. Copy the new binary to `/usr/local/bin/text_expander`.
+3. Set up the systemd service configuration at `/etc/systemd/system/text_expander.service`.
+4. Reload systemd, enable, and start the daemon.
+
+Your trigger configurations will remain preserved in `~/.config/text_expander/`.
 
 ## Usage
 
@@ -99,13 +116,14 @@ matches:
 - `vars` with `date`, `shell`, `clipboard`, and `echo` types
 - `global_vars` for shared variables across matches
 - Recursive YAML file loading
+- Cursor hints/placement (`$|$`)
 
 ### Not Supported
 
 These espanso features are intentionally out of scope for this minimal tool:
 
 - Regex triggers, word boundaries, case propagation
-- Forms, choice dialogs, cursor hints (`$|$`)
+- Forms, choice dialogs
 - Rich text (markdown/HTML), image pasting
 - App-specific configs, toggle key, search bar
 - Config options (backend, clipboard_threshold, etc.)
