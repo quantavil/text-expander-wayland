@@ -20,7 +20,11 @@ if [ -f "$BINARY_SRC" ]; then
         echo "Stopping active text_expander service..."
         systemctl stop text_expander || true
     fi
+    # Kill any stray processes not managed by systemd
+    pkill -x text_expander 2>/dev/null || true
+    sleep 0.5
     echo "Copying binary to $BINARY_DST..."
+    rm -f "$BINARY_DST"
     cp "$BINARY_SRC" "$BINARY_DST"
     chmod +x "$BINARY_DST"
 else
