@@ -21,26 +21,26 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let daemon_mode = args.iter().any(|a| a == "-d" || a == "--daemon");
 
-    eprintln!("text_expander - lightweight espanso replacement for Wayland");
+    eprintln!("\x1b[1m🚀 [text_expander]\x1b[0m lightweight espanso replacement for Wayland");
 
     let triggers = load_configs();
     if triggers.is_empty() {
-        eprintln!("No triggers loaded. Create config in ~/.config/text_expander/");
+        eprintln!("\x1b[31m❌ [config] Error:\x1b[0m No triggers loaded. Create config in ~/.config/text_expander/");
         process::exit(1);
     }
-    eprintln!("Loaded {} triggers", triggers.len());
+    eprintln!("\x1b[32m📦 [config]\x1b[0m Loaded {} triggers total", triggers.len());
 
     let mut keyboards = find_keyboards();
     if keyboards.is_empty() {
-        eprintln!("No keyboards found. Need read access to /dev/input/*");
+        eprintln!("\x1b[31m❌ [input] Error:\x1b[0m No keyboards found. Need read access to /dev/input/*");
         process::exit(1);
     }
 
     if daemon_mode {
-        eprintln!("Daemonizing...");
+        eprintln!("\x1b[34mℹ️  [daemon]\x1b[0m Daemonizing...");
         daemonize();
     } else {
-        eprintln!("Ready! (use -d/--daemon to run in background)");
+        eprintln!("\x1b[32m🟢 [daemon]\x1b[0m Ready! (use -d/--daemon to run in background)");
     }
 
     let mut expander = TextExpander::new(triggers);
@@ -70,7 +70,7 @@ fn main() {
             let scanned = find_keyboards();
             for (path, device) in scanned {
                 if !keyboards.iter().any(|(p, _)| *p == path) {
-                    eprintln!("New keyboard hotplugged: {:?}", path);
+                    eprintln!("\x1b[36m🔌 [input]\x1b[0m New keyboard hotplugged: {:?}", path);
                     keyboards.push((path, device));
                 }
             }
@@ -81,12 +81,12 @@ fn main() {
         while i > 0 {
             i -= 1;
             if pollfds[i].revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0 {
-                eprintln!("Keyboard disconnected (path: {:?}), removing", keyboards[i].0);
+                eprintln!("\x1b[33m⚠️  [input]\x1b[0m Keyboard disconnected (path: {:?}), removing", keyboards[i].0);
                 keyboards.remove(i);
             }
         }
         if keyboards.is_empty() {
-            eprintln!("All keyboards disconnected, exiting");
+            eprintln!("\x1b[31m❌ [input]\x1b[0m All keyboards disconnected, exiting");
             process::exit(0);
         }
 

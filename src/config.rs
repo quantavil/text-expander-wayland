@@ -172,11 +172,11 @@ pub fn load_yaml_recursive(dir: &PathBuf, triggers: &mut HashMap<String, Trigger
                         }
                     }
                     if count > 0 {
-                        eprintln!("Loaded {} triggers from {:?}", count, path);
+                        eprintln!("\x1b[36m✨ [config]\x1b[0m Loaded {} triggers from {:?}", count, path);
                     }
                 }
                 Err(e) => {
-                    eprintln!("Warning: failed to parse {:?}: {}", path, e);
+                    eprintln!("\x1b[33m⚠️  [config] Warning:\x1b[0m failed to parse {:?}: {}", path, e);
                 }
             }
         }

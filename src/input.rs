@@ -60,7 +60,7 @@ pub fn find_keyboards() -> Vec<(PathBuf, Device)> {
         if !keys.contains(KeyCode::KEY_A) || !keys.contains(KeyCode::KEY_Z) { continue }
 
         let name = device.name().unwrap_or("unknown");
-        eprintln!("Found keyboard: {:?} - {}", path, name);
+        eprintln!("\x1b[34m⌨️  [input]\x1b[0m Found keyboard: {:?} - {}", path, name);
 
         let name_lower = name.to_lowercase();
         let is_remapper = name_lower.contains("keyd") || name_lower.contains("kmonad") || name_lower.contains("kanata");
@@ -73,7 +73,7 @@ pub fn find_keyboards() -> Vec<(PathBuf, Device)> {
     }
 
     if let Some(vkbd) = virtual_kbd {
-        eprintln!("Using virtual keyboard only (keyd/kmonad/kanata detected)");
+        eprintln!("\x1b[35m🔒 [input]\x1b[0m Using virtual keyboard only (keyd/kmonad/kanata detected)");
         vec![vkbd]
     } else {
         keyboards
