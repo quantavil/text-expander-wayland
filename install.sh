@@ -114,7 +114,7 @@ ai:
   model: "gemini-3.1-flash-lite" # Optional, defaults to gemini-3.1-flash-lite
   matches:
     - hotkey: "ctrl+alt+f"
-      prompt: "You are a professional editor. Correct any grammar, spelling, or punctuation errors in the text below. Keep the original meaning and tone. Respond ONLY with the corrected text and absolutely nothing else. Do not add quotes, explanations, or markdown formatting."
+      prompt: "You are a professional editor. Correct any grammar, spelling, or punctuation errors in the text below. Keep the original meaning and tone. Do not use em dashes. Respond ONLY with the corrected text and absolutely nothing else. Do not add quotes, explanations, or markdown formatting."
 EOF
 fi
 
