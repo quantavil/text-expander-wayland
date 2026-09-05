@@ -128,15 +128,17 @@ pub fn get_wayland_env() -> &'static [(String, String)] {
             env_vars.push(("XDG_RUNTIME_DIR".into(), xdg_runtime.clone()));
         }
 
-        let mut wayland_display = env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-1".into());
+        let mut wayland_display = env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "wayland-0".into());
         if !xdg_runtime.is_empty() {
             if let Ok(entries) = fs::read_dir(&xdg_runtime) {
-                for entry in entries.flatten() {
-                    let name = entry.file_name().to_string_lossy().into_owned();
-                    if name.starts_with("wayland-") && !name.ends_with(".lock") {
-                        wayland_display = name;
-                        break;
-                    }
+                let mut sockets: Vec<String> = entries
+                    .flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .filter(|name| name.starts_with("wayland-") && !name.ends_with(".lock"))
+                    .collect();
+                sockets.sort();
+                if let Some(first) = sockets.into_iter().next() {
+                    wayland_display = first;
                 }
             }
         }
@@ -145,6 +147,10 @@ pub fn get_wayland_env() -> &'static [(String, String)] {
 
         if let Some(user) = get_sudo_user() {
             env_vars.push(("USER".into(), user.clone()));
+            let home = env::var("HOME").unwrap_or_else(|_| format!("/home/{}", user));
+            env_vars.push(("HOME".into(), home));
+        } else if let Ok(home) = env::var("HOME") {
+            env_vars.push(("HOME".into(), home));
         }
         env_vars
     })

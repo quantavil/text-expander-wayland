@@ -64,8 +64,8 @@ matches:
         params:
           format: "%H:%M"
 
-  # Date and Time variable
-  - trigger: ";datetime"
+  # Timestamp variable
+  - trigger: ";timestamp"
     replace: "{{dt}}"
     vars:
       - name: dt

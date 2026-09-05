@@ -111,4 +111,91 @@ fn test_keypad_keys_mapped() {
     assert_eq!(key_to_char(KeyCode::KEY_KPPLUS, false), Some('+'));
 }
 
+#[test]
+fn test_paired_modifiers_do_not_desync() {
+    let mut triggers = HashMap::new();
+    triggers.insert("A".to_string(), Trigger {
+        replace: "success".to_string(),
+        vars: std::sync::Arc::new(vec![]),
+    });
+    let mut expander = TextExpander::new(triggers, None, false);
+
+    assert!(expander.process(KeyCode::KEY_LEFTSHIFT, true).is_none());
+    assert!(expander.process(KeyCode::KEY_RIGHTSHIFT, true).is_none());
+    assert!(expander.process(KeyCode::KEY_LEFTSHIFT, false).is_none());
+
+    let ev = expander.process(KeyCode::KEY_A, true);
+    assert!(ev.is_some(), "Trigger 'A' should match because Right Shift is still held");
+
+    assert!(expander.process(KeyCode::KEY_RIGHTSHIFT, false).is_none());
+}
+
+#[test]
+fn test_capslock_repeat_does_not_toggle() {
+    let mut triggers = HashMap::new();
+    triggers.insert("A".to_string(), Trigger {
+        replace: "caps_active".to_string(),
+        vars: std::sync::Arc::new(vec![]),
+    });
+    let mut expander = TextExpander::new(triggers, None, false);
+
+    assert!(expander.process(KeyCode::KEY_CAPSLOCK, true).is_none());
+    assert!(expander.process(KeyCode::KEY_CAPSLOCK, true).is_none());
+    assert!(expander.process(KeyCode::KEY_CAPSLOCK, true).is_none());
+
+    let ev = expander.process(KeyCode::KEY_A, true);
+    assert!(ev.is_some(), "CapsLock should remain ON after repeated key events");
+
+    assert!(expander.process(KeyCode::KEY_CAPSLOCK, false).is_none());
+}
+
+#[test]
+fn test_backspace_repeat_pops_buffer() {
+    let mut triggers = HashMap::new();
+    triggers.insert(";b".to_string(), Trigger {
+        replace: "expanded".to_string(),
+        vars: std::sync::Arc::new(vec![]),
+    });
+    let mut expander = TextExpander::new(triggers, None, false);
+
+    expander.process(KeyCode::KEY_SEMICOLON, true);
+    expander.process(KeyCode::KEY_SEMICOLON, false);
+    expander.process(KeyCode::KEY_X, true);
+    expander.process(KeyCode::KEY_X, false);
+
+    expander.process(KeyCode::KEY_BACKSPACE, true);
+    expander.process(KeyCode::KEY_BACKSPACE, true);
+    expander.process(KeyCode::KEY_BACKSPACE, false);
+
+    let ev = expander.process(KeyCode::KEY_B, true);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn test_expansion_char_count() {
+    let mut triggers = HashMap::new();
+    triggers.insert(";timestamp".to_string(), Trigger {
+        replace: "now".to_string(),
+        vars: std::sync::Arc::new(vec![]),
+    });
+
+    let mut expander = TextExpander::new(triggers, None, false);
+    expander.process(KeyCode::KEY_SEMICOLON, true);
+    expander.process(KeyCode::KEY_SEMICOLON, false);
+    for &k in &[
+        KeyCode::KEY_T, KeyCode::KEY_I, KeyCode::KEY_M, KeyCode::KEY_E,
+        KeyCode::KEY_S, KeyCode::KEY_T, KeyCode::KEY_A, KeyCode::KEY_M,
+    ] {
+        expander.process(k, true);
+        expander.process(k, false);
+    }
+    let ev = expander.process(KeyCode::KEY_P, true);
+    assert!(ev.is_some());
+    if let Some(InputEvent::Expansion(chars, trig)) = ev {
+        assert_eq!(chars, 10);
+        assert_eq!(trig.replace, "now");
+    }
+}
+
+
 

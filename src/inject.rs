@@ -5,14 +5,13 @@ use std::{
     process,
     thread,
     time::Duration,
-    sync::OnceLock,
 };
 use crate::config::{run_command, user_cmd};
 use crate::input::key_to_char;
 
 const CLIPBOARD_PASTE_THRESHOLD: usize = 25;
 const KEY_CONFLICT_CHECK_LEN: usize = 25;
-const TYPING_DELAY_MS: u64 = 30;
+pub const TYPING_DELAY_MS: u64 = 30;
 
 static ACTIVE_CLIPBOARD_EXPANSIONS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 static ORIGINAL_CLIPBOARD: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
@@ -47,36 +46,33 @@ pub fn run_wtype(args: &[&str]) {
     let _ = cmd.status();
 }
 
-pub fn get_ydotool_socket_path() -> Option<&'static PathBuf> {
-    static CACHE: OnceLock<Option<PathBuf>> = OnceLock::new();
-    CACHE.get_or_init(|| {
-        if let Ok(socket_env) = env::var("YDOTOOL_SOCKET") {
-            let path = PathBuf::from(socket_env);
-            if path.exists() {
-                return Some(path);
-            }
-        }
-
-        let real_uid = env::var("SUDO_UID").unwrap_or_default();
-        let uid = if !real_uid.is_empty() {
-            real_uid
-        } else {
-            unsafe { libc::getuid() }.to_string()
-        };
-
-        let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
-            xdg
-        } else {
-            format!("/run/user/{}", uid)
-        };
-
-        let path = PathBuf::from(&xdg_runtime).join(".ydotool_socket");
+pub fn get_ydotool_socket_path() -> Option<PathBuf> {
+    if let Ok(socket_env) = env::var("YDOTOOL_SOCKET") {
+        let path = PathBuf::from(socket_env);
         if path.exists() {
-            Some(path)
-        } else {
-            None
+            return Some(path);
         }
-    }).as_ref()
+    }
+
+    let real_uid = env::var("SUDO_UID").unwrap_or_default();
+    let uid = if !real_uid.is_empty() {
+        real_uid
+    } else {
+        unsafe { libc::getuid() }.to_string()
+    };
+
+    let xdg_runtime = if let Ok(xdg) = env::var("XDG_RUNTIME_DIR") {
+        xdg
+    } else {
+        format!("/run/user/{}", uid)
+    };
+
+    let path = PathBuf::from(&xdg_runtime).join(".ydotool_socket");
+    if path.exists() {
+        Some(path)
+    } else {
+        None
+    }
 }
 
 fn ydotool_or_wtype(ydotool_args: Vec<String>, wtype_args: Vec<String>) {
@@ -133,7 +129,7 @@ pub fn simulate_cursor_move(moves: usize) {
 
 pub fn simulate_type_fallback(text: &str) {
     ydotool_or_wtype(
-        vec!["type".into(), "-d".into(), "1".into(), "-H".into(), "1".into(), text.to_string()],
+        vec!["type".into(), "-d".into(), "1".into(), "-H".into(), "1".into(), "--".into(), text.to_string()],
         vec!["--".into(), text.to_string()],
     );
 }
@@ -206,7 +202,13 @@ pub fn type_expansion(backspaces: usize, text: &str, last_key: Option<KeyCode>, 
         });
     } else {
         simulate_backspaces(backspaces);
+        if backspaces > 0 {
+            thread::sleep(Duration::from_millis(TYPING_DELAY_MS));
+        }
         simulate_type_fallback(&actual_text);
-        simulate_cursor_move(cursor_moves);
+        if cursor_moves > 0 {
+            thread::sleep(Duration::from_millis(TYPING_DELAY_MS));
+            simulate_cursor_move(cursor_moves);
+        }
     }
 }

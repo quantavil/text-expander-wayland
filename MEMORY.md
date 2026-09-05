@@ -42,4 +42,11 @@ text_expander/
 ## Blunders
 - 2026-07-16: Placed AI and input unit tests inside `src/ai.rs` and `src/input.rs`, which cluttered production code. Exposing the library crate `lib.rs` and moving all tests to `tests/ai_tests.rs` and `tests/input_tests.rs` resolved this.
 - 2026-07-16: Fixed overlapping clipboard expansion race condition, modifier wait handling, NSS home directory resolution, keypad desync issues, and asynchronous cancellation of shell expansions.
+- 2026-09-05: Fixed KEY_COUNT incrementing on key release (val == 0) and modifier keys, which caused false-positive cancellation of async shell expansions like ;ip.
+- 2026-09-05: Fixed key autorepeat handling (val == 2) for Backspace and typing buffer sync; suppressed repeat on CapsLock toggle and AI hotkeys.
+- 2026-09-05: Fixed paired modifier desync (e.g. holding right shift while releasing left shift) by tracking left and right modifiers independently.
+- 2026-09-05: Fixed expansion backspace character count (using trig.chars().count() instead of trig.len()), UTF-8 safe buffer drain, and word boundary index lookup.
+- 2026-09-05: Fixed AI text replacement clipboard race by calling simulate_paste directly instead of type_expansion.
+- 2026-09-05: Included HOME in get_wayland_env() and prioritized wayland-0 socket discovery.
+- 2026-09-05: Replaced starter trigger ;datetime with ;timestamp.
 

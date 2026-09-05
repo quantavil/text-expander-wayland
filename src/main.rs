@@ -17,6 +17,21 @@ use std::{
 static AI_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static KEY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
+fn is_modifier(key: KeyCode) -> bool {
+    matches!(
+        key,
+        KeyCode::KEY_LEFTSHIFT
+            | KeyCode::KEY_RIGHTSHIFT
+            | KeyCode::KEY_LEFTCTRL
+            | KeyCode::KEY_RIGHTCTRL
+            | KeyCode::KEY_LEFTALT
+            | KeyCode::KEY_RIGHTALT
+            | KeyCode::KEY_LEFTMETA
+            | KeyCode::KEY_RIGHTMETA
+            | KeyCode::KEY_CAPSLOCK
+    )
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -145,13 +160,16 @@ fn main() {
                 for ev in events {
                     if ev.event_type() == EventType::KEY {
                         let val = ev.value();
-                        if val == 0 || val == 1 {
+                        let code = KeyCode::new(ev.code());
+                        if (val == 1 || val == 2) && !is_modifier(code) {
                             KEY_COUNT.fetch_add(1, Ordering::SeqCst);
-                            if let Some(event) = expander.process(KeyCode::new(ev.code()), val == 1) {
+                        }
+                        if val == 0 || val == 1 || val == 2 {
+                            if let Some(event) = expander.process(code, val != 0) {
                                 match event {
                                     InputEvent::Expansion(n, trigger) => {
                                         let tx_typist = tx.clone();
-                                        let last_key = Some(KeyCode::new(ev.code()));
+                                        let last_key = Some(code);
                                         let start_key_count = KEY_COUNT.load(Ordering::SeqCst);
                                         thread::spawn(move || {
                                             let text = trigger.expand();

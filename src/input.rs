@@ -1,6 +1,6 @@
 use evdev::{Device, EventType, KeyCode};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::PathBuf,
     sync::atomic::{AtomicU8, Ordering},
@@ -129,11 +129,20 @@ pub struct TextExpander {
     sorted_triggers: Vec<(String, Trigger)>,
     buffer: String,
     max_len: usize,
+    left_shift: bool,
+    right_shift: bool,
     shift: bool,
     capslock: bool,
+    left_ctrl: bool,
+    right_ctrl: bool,
     ctrl: bool,
+    left_alt: bool,
+    right_alt: bool,
     alt: bool,
+    left_meta: bool,
+    right_meta: bool,
     meta: bool,
+    keys_down: HashSet<KeyCode>,
     ai_matches: Vec<(Hotkey, String)>,
 }
 
@@ -164,11 +173,20 @@ impl TextExpander {
             sorted_triggers,
             buffer: String::with_capacity(max_len),
             max_len,
+            left_shift: false,
+            right_shift: false,
             shift: false,
             capslock: initial_capslock,
+            left_ctrl: false,
+            right_ctrl: false,
             ctrl: false,
+            left_alt: false,
+            right_alt: false,
             alt: false,
+            left_meta: false,
+            right_meta: false,
             meta: false,
+            keys_down: HashSet::new(),
             ai_matches,
         }
     }
@@ -183,36 +201,71 @@ impl TextExpander {
     }
 
     pub fn process(&mut self, key: KeyCode, pressed: bool) -> Option<InputEvent> {
-        if key == KeyCode::KEY_LEFTSHIFT || key == KeyCode::KEY_RIGHTSHIFT {
-            self.shift = pressed;
+        let is_repeat = pressed && !self.keys_down.insert(key);
+        if !pressed {
+            self.keys_down.remove(&key);
+        }
+
+        if key == KeyCode::KEY_LEFTSHIFT {
+            self.left_shift = pressed;
+            self.shift = self.left_shift || self.right_shift;
+            self.update_modifiers_down();
+            return None;
+        }
+        if key == KeyCode::KEY_RIGHTSHIFT {
+            self.right_shift = pressed;
+            self.shift = self.left_shift || self.right_shift;
             self.update_modifiers_down();
             return None;
         }
 
-        if key == KeyCode::KEY_LEFTCTRL || key == KeyCode::KEY_RIGHTCTRL {
-            self.ctrl = pressed;
+        if key == KeyCode::KEY_LEFTCTRL {
+            self.left_ctrl = pressed;
+            self.ctrl = self.left_ctrl || self.right_ctrl;
+            self.update_modifiers_down();
+            return None;
+        }
+        if key == KeyCode::KEY_RIGHTCTRL {
+            self.right_ctrl = pressed;
+            self.ctrl = self.left_ctrl || self.right_ctrl;
             self.update_modifiers_down();
             return None;
         }
 
-        if key == KeyCode::KEY_LEFTALT || key == KeyCode::KEY_RIGHTALT {
-            self.alt = pressed;
+        if key == KeyCode::KEY_LEFTALT {
+            self.left_alt = pressed;
+            self.alt = self.left_alt || self.right_alt;
+            self.update_modifiers_down();
+            return None;
+        }
+        if key == KeyCode::KEY_RIGHTALT {
+            self.right_alt = pressed;
+            self.alt = self.left_alt || self.right_alt;
             self.update_modifiers_down();
             return None;
         }
 
-        if key == KeyCode::KEY_LEFTMETA || key == KeyCode::KEY_RIGHTMETA {
-            self.meta = pressed;
+        if key == KeyCode::KEY_LEFTMETA {
+            self.left_meta = pressed;
+            self.meta = self.left_meta || self.right_meta;
+            self.update_modifiers_down();
+            return None;
+        }
+        if key == KeyCode::KEY_RIGHTMETA {
+            self.right_meta = pressed;
+            self.meta = self.left_meta || self.right_meta;
             self.update_modifiers_down();
             return None;
         }
 
         if key == KeyCode::KEY_CAPSLOCK && pressed {
-            self.capslock = !self.capslock;
+            if !is_repeat {
+                self.capslock = !self.capslock;
+            }
             return None;
         }
 
-        if pressed {
+        if pressed && !is_repeat {
             for (hk, prompt) in &self.ai_matches {
                 if self.ctrl == hk.ctrl && self.alt == hk.alt && self.shift == hk.shift && self.meta == hk.meta && key == hk.key {
                     self.buffer.clear();
@@ -262,8 +315,13 @@ impl TextExpander {
 
         if let Some(c) = key_to_char(key, effective_shift) {
             self.buffer.push(c);
-            if self.buffer.len() > self.max_len {
-                self.buffer.drain(..self.buffer.len() - self.max_len);
+            let excess = self.buffer.len().saturating_sub(self.max_len);
+            if excess > 0 {
+                let cut_idx = self.buffer.char_indices()
+                    .map(|(i, _)| i)
+                    .find(|&i| i >= excess)
+                    .unwrap_or(self.buffer.len());
+                self.buffer.drain(..cut_idx);
             }
 
             for (trig, data) in &self.sorted_triggers {
@@ -272,7 +330,7 @@ impl TextExpander {
                         if first_char.is_alphanumeric() {
                             let start_idx = self.buffer.len() - trig.len();
                             if start_idx > 0 {
-                                if let Some(char_before) = self.buffer.chars().nth(start_idx - 1) {
+                                if let Some(char_before) = self.buffer[..start_idx].chars().next_back() {
                                     if char_before.is_alphanumeric() {
                                         continue;
                                     }
@@ -281,7 +339,7 @@ impl TextExpander {
                         }
                     }
 
-                    let result = InputEvent::Expansion(trig.len(), data.clone());
+                    let result = InputEvent::Expansion(trig.chars().count(), data.clone());
                     self.buffer.clear();
                     return Some(result);
                 }

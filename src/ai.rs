@@ -2,7 +2,7 @@ use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use crate::config::AiConfig;
-use crate::inject::{copy_to_clipboard, clear_clipboard, simulate_copy, type_expansion};
+use crate::inject::{copy_to_clipboard, clear_clipboard, simulate_copy, simulate_paste, TYPING_DELAY_MS};
 
 const CLIPBOARD_POLL_RETRIES: usize = 25;
 const CLIPBOARD_POLL_INTERVAL_MS: u64 = 20;
@@ -142,7 +142,8 @@ pub fn trigger_ai_fix(prompt: &str, ai_config: &AiConfig) -> Result<(), Box<dyn 
     })?;
 
     copy_to_clipboard(&corrected_text);
-    type_expansion(0, &corrected_text, None, true);
+    thread::sleep(Duration::from_millis(TYPING_DELAY_MS));
+    simulate_paste();
 
     let saved = original_clipboard;
     thread::spawn(move || {
