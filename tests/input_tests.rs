@@ -174,7 +174,7 @@ fn test_backspace_repeat_pops_buffer() {
 #[test]
 fn test_expansion_char_count() {
     let mut triggers = HashMap::new();
-    triggers.insert(";timestamp".to_string(), Trigger {
+    triggers.insert(";ts".to_string(), Trigger {
         replace: "now".to_string(),
         vars: std::sync::Arc::new(vec![]),
     });
@@ -182,17 +182,13 @@ fn test_expansion_char_count() {
     let mut expander = TextExpander::new(triggers, None, false);
     expander.process(KeyCode::KEY_SEMICOLON, true);
     expander.process(KeyCode::KEY_SEMICOLON, false);
-    for &k in &[
-        KeyCode::KEY_T, KeyCode::KEY_I, KeyCode::KEY_M, KeyCode::KEY_E,
-        KeyCode::KEY_S, KeyCode::KEY_T, KeyCode::KEY_A, KeyCode::KEY_M,
-    ] {
-        expander.process(k, true);
-        expander.process(k, false);
-    }
-    let ev = expander.process(KeyCode::KEY_P, true);
+    expander.process(KeyCode::KEY_T, true);
+    expander.process(KeyCode::KEY_T, false);
+
+    let ev = expander.process(KeyCode::KEY_S, true);
     assert!(ev.is_some());
     if let Some(InputEvent::Expansion(chars, trig)) = ev {
-        assert_eq!(chars, 10);
+        assert_eq!(chars, 3);
         assert_eq!(trig.replace, "now");
     }
 }
